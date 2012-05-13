@@ -1,37 +1,21 @@
-# Copyright 2011 Google Inc. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-# 27 Jan 2012, Google Tasks Backup (tasks-backup), based on Google Tasks Porter
-
-# ===== Production host and version ======
-#application: tasks-backup
-#version: 2
 
 # ===== Limited Public Test host and version ======
-application: js-tasks
-version: 2
+application: import-tasks
+version: 1
 
 # ===== Private Alpha Test host and version ======
 #application: js-tasks-test
-#version: 2
+#version: 1
 
 # ===== Local host ==========
-#application: tasks-backup-local
+#application: import-tasks-local
 #version: 1
 
 runtime: python
 api_version: 1
+
+# Static files remain cached by the browser for 12 hours
+default_expiration: "12h"
 
 
 error_handlers:
@@ -68,8 +52,19 @@ handlers:
   login: admin
   secure: always
 
-- url: /.*
-  script: tasks_backup.py
+- url: /admin/.*
+  script: import_tasks.py
+  login: admin
+  secure: always
+
+# Main page does not require login, so that anyone can read main page before authorising
+- url: /
+  script: import_tasks.py
+  secure: always
+
+# Subsequent pages require user to be logged in
+- url: /.+
+  script: import_tasks.py
   login: required
   secure: always
 

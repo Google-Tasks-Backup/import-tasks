@@ -23,12 +23,12 @@ DEFAULT_USER_AGENT = 'tasks-backup/2.0'
 # This should match the "Application Title:" value set in "Application Settings" in the App Engine
 # administration for the server that the app will be running on. This value is displyed in the app,
 # but the value from the admin screen is "Displayed if users authenticate to use your application."
-app_titles = {'tb-test-server.appspot.com'                 : "Test - Google Tasks Backup", 
-              'localhost:8084'                             : "Local - Google Tasks Backup",
-              'tasks-backup.appspot.com'                   : "Google Tasks Backup" }
+app_titles = {'tb-test-server.appspot.com'                 : "Test - Import Google Tasks", 
+              'localhost:8084'                             : "Local - Import Google Tasks",
+              'tasks-backup.appspot.com'                   : "Import Google Tasks" }
                 
 # Title used when host name is not found, or not yet known
-DEFAULT_APP_TITLE = "Google Tasks Backup"
+DEFAULT_APP_TITLE = "Import Google Tasks"
 
 # According to the "Application Settings" admin page 
 #   (e.g., https://appengine.google.com/settings?app_id=s~js-tasks&version_id=4.356816042992321979)
@@ -40,13 +40,13 @@ DEFAULT_APP_TITLE = "Google Tasks Backup"
 # at https://www.google.com/accounts/IssuedAuthSubTokens
 # The product name is set in the API Access page as "Product Name", at
 # https://code.google.com/apis/console and is linked to the client ID
-product_names = { '164364198675.apps.googleusercontent.com'    : "Google Tasks Backup", 
+product_names = { '164364198675.apps.googleusercontent.com'    : "Import Google Tasks", 
                   '823249731479.apps.googleusercontent.com'    : "JS Tasks",
                   '425175418944.apps.googleusercontent.com'    : "JS Tasks Test",
                   '314627146721.apps.googleusercontent.com'    : "GTB Local"}
 
 # Product name used if no matching client ID found in product_names 
-DEFAULT_PRODUCT_NAME = "Google Tasks Backup"
+DEFAULT_PRODUCT_NAME = "Import Google Tasks"
 
 # Host messages are optional
 host_msgs = { 'tb-test-server.appspot.com'                 : "*** Running on test AppEngine server ***", 
@@ -66,7 +66,7 @@ BACKUP_REQUEST_QUEUE_NAME = 'tasks-backup-request'
 
 TASKS_QUEUE_KEY_NAME = 'user_email'
 
-HOME_PAGE_URL = '/'
+MAIN_PAGE_URL = '/'
 
 START_BACKUP_URL = '/startbackup'
 

@@ -5,7 +5,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
     <head>
         <title>Information about Google Tasks</title>
-        <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css"></link>
+        <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css" />
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
         <script type="text/javascript">
             // Copyright 2001 Idocs.com      
@@ -76,116 +76,17 @@
     <div class="break">
     </div>
     
-    <h2>Background information about Google Tasks data</h2>
-    
-    
-    <div class="break">
-        Note that this information is based on my own discoveries and conclusions as at 27 Feb 2012. I hope that this information helps people, but I cannot guarantee the accuracy or completeness of this information. Note also that Google may change their specifications, in which case this information may be out of date.
-    </div>
-    
-    <h3>Understanding the Raw and Python data formats</h3>
-    
-    <div class="break">
-        <ul>
-            <li>
-            The Python format includes all the data that Google stores for each task. The meaning of each task property is described at <a href="https://developers.google.com/google-apps/tasks/v1/reference/tasks#resource">developers.google.com/google-apps/tasks/v1/reference/tasks#resource</a>  
-            </li>
-            <li>The Raw CSV format includes everything except the <span class="property-name">links</span> property.</li>
-            <li>In the Raw and Python formats, subtasks are related to parent tasks through the <span class="property-name">parent</span> property. <span class="take-note-smaller">(<a href="#notes">Note</a> 4)</span></li>
-            <li>The Nested Python format adds a <span class="property-name">children</span> property to tasks, and moves any child tasks to the parent task's <span class="property-name">children</span> property.</li>
-        </ul>
-        
-        
-    </div>
-    
-    <div class="break">
-        Most of the properties are self-explanatory, however the relationship between <span class="property-name">status</span>, <span class="property-name">hidden</span> and <span class="property-name">deleted</span> may require some additional explanation.
-        <ul>
-            <li>
-                Mark a task complete ==> <span class="property-name">status</span> changes from "needsAction" to "completed".
-                <ul>
-                    <li>Task remains visible in [My Order] and [Sort by date] views.</li>
-                </ul>
-            </li>
-            <li>
-                Mark a task complete, and then click [Clear completed] ==> <span class="property-name">status</span> = "completed", <span class="property-name">hidden</span> = "True"
-                <ul>
-                    <li>
-                         Task only appears in [Completed tasks] view
-                    </li>
-                </ul>
-            </li>
-            <li>
-                Mark a task complete, and then click [Delete] ==> <span class="property-name">status</span> = "completed", <span class="property-name">deleted</span> = "True"
-                <ul>
-                    <li>
-                        Task only appears in [Trash] view <span class="take-note-smaller">(<a href="#notes">Note</a> 3)</span>
-                    </li>
-                </ul>
-            </li>
-            
-        </ul>
-    </div>
-
-
-    <div class="break">
-        <a name="Table1">Table 1 lists the various states and the corresponding task property values.</a>
-    </div>
-
-    <table border="1" cellpadding="5">
-        <caption class="heading" >Table 1: Task states</caption>
-        <tr>
-            <th colspan="3">Task properties <span class="take-note-smaller">(<a href="#notes">Note</a> 1, 2)</span></th><th rowspan="2">Description</th><th colspan="3">Visible in View:</th>
-        </tr>
-        <tr>
-            <th><span class="property-name">status</span></th>
-            <th><span class="property-name">deleted</span></th>
-            <th><span class="property-name">hidden</span></th>
-            <th class="view-tr">My order<br />Sort by date</th>
-            <th class="view-tr">Completed tasks</th>
-            <th class="view-tr">Trash<br/><span class="take-note-smaller">(<a href="#notes">Note</a> 3)</span></th>
-        </tr>
-        
-        <tr>
-            <td>needsAction</td><td></td><td></td><td>To be completed, visible in main window</td><td>Yes</td><td>No</td><td>No</td>
-        </tr>
-        <tr>
-            <td>completed</td><td></td><td></td><td>Marked complete, before clicking [Clear completed]</td><td>Yes</td><td>Yes</td><td>No</td>
-        </tr>
-        <tr>
-            <td>completed</td><td></td><td>True</td><td>Marked complete, after clicking [Clear completed]</td><td>No</td><td>Yes</td><td>No</td>
-        </tr>
-        <tr>
-            <td>needsAction</td><td>True</td><td></td><td>Deleted incomplete task. Visible only in [Trash]</td><td>No</td><td>No</td><td>Yes</td>
-        </tr>
-        <tr>
-            <td>completed</td><td>True</td><td></td><td>Deleted completed task. Visible only in [Trash]</td><td>No</td><td>No</td><td>Yes</td>
-        </tr>
-        <tr>
-            <td>needsAction</td><td>True</td><td>True</td> <td class="not-valid" colspan="4"> ======= Not valid =======</td>
-        </tr>
-        <tr>
-            <td>needsAction</td><td></td><td>True</td><td class="not-valid" colspan="4"> ======= Not valid =======</td>
-        </tr>
-        <tr>
-            <td>completed</td><td>True</td><td>True</td>   <td class="not-valid" colspan="4"> ======= Not valid =======</td>
-        </tr>
-    </table>
- 
-    <div class="break">
-    </div>
- 
-    <h3>Other problems</h3>
-    <div class="break">
-        The <span class="property-name">completed</span> property has occassionally contained invalid timestamps, where the year is stored as a large negative number such as -1701567. In this case, the application sets the <span class="property-name">completed</span> property to "0001-01-01 00:00:00"
-        
-    </div>
-    
     <a name="import_export_description"></a>
-    <h2>Description of the {{ app_title }} "Import/Export CSV" file format</h2>
+    <h2>Description of the "Import/Export CSV" file format</h2>
     <div class="break">
-        Files exported from {{ app_title }} in this format have a filename format of <span class="fixed-font">tasks_import_export_XXXXXX.csv</span>, where <span class="fixed-font">XXXXXX</span> identifies the account name and export date. 
+        Files exported from Google Tasks Export in this format have a filename format of <span class="fixed-font">tasks_import_export_XXXXXX.csv</span>, where <span class="fixed-font">XXXXXX</span> identifies the account name and export date. 
     </div>
+    <div class="break">
+        The import/export file format includes all the data required to (re)create each task. 
+        The meaning of each task property is summarised in 
+        <a href="#Table1">Table 1</a>
+    </div>
+    
     <div class="break">
         The file is a standard Windows-format CSV (comma-separated-values) file, and contains all the data that is needed to re-create the tasklists and tasks in a Google account. The import file must observe the following rules;
         <ul>
@@ -197,18 +98,42 @@
             <li>There must be no spaces between fields and the comma separators.</li>
             <li>Multi-line text is allowed in the notes field, by using <span class="fixed-font">\n</span> as the line break.</li>
             <li>A blank field may be indicated by <span class="fixed-font">""</span> (empty string) or by having no space between consecutive commas.</li>
-            <li>Dates and times are UTC, and must be formatted as indicated in <a href="#Table2">Table 2</a><br />
+            <li>Dates and times are UTC, and must be formatted as indicated in <a href="#Table1">Table 1</a><br />
                 <span class="italic">Note that the "UTC " prefix on date fields serves two purposes. It reminds the user that the fields are UTC, and it prevents spreadsheet programs such as Excel and OpenOffice Calc from rewriting date and time formatting.</span></li>
-            <li>Task state must be consistent. Refer to <a href="#Table1">Table 1</a> for valid states.</li>
+            <li>Task state must be consistent. Refer to <a href="#Table2">Table 2</a> for valid states.</li>
             <li>If editing the import/export file in OpenOffice Calc, choose "Separated by Comma" and "Quoted field as text"</li>
+            <li>
+                This format does not include Task Links. 
+                <br />
+                <span class="italic">
+                    As far as I am aware, the only use for Task Links is when an email message is turned into a task; 
+                    the link then refers to the original email message.
+                    If tasks are restored into a different account, Task Links would not work (because they would refer to messages in another account).
+                </span>
+            </li>
         </ul>
     </div>
     <div class="break">
-        When importing tasks into an existing tasklist, {{ app_title }} is not able to check for duplicate tasks. If you 
+        <h3>Cautions when importing;</h3>
+        <ul>
+            <li>
+            Note that tasklist names are case-sensitive, so if you have an existing tasklist name <span class="fixed-font">"Apples"</span>, and the tasklist name in your import data is <span class="fixed-font">"apples"</span>, a new tasklist named <span class="fixed-font">"apples"</span> will be created even if you have chosen "Add task to existing tasklists."
+            </li>
+            <li>
+                When importing tasks into an existing tasklist, Import Google Tasks is not able to check for duplicate tasks. The imported task will simply be added to the specified tasklist, potentially resulting in duplicate tasks. If you think that the imported data may contain tasks which already exist in your existing tasklist, you may wish to create new tasklists by appending something to the imported tasklist name (either the date and time, or your own text).
+            </li>
+            <li>
+                If you are sure that the import data contains the most current list of tasks, you can delete or rename existing tasklists, so that the newly created tasklists will contain only the imported data.
+            </li>
+            <li>
+                If either the existing or imported data has duplicate tasklist names (not recommended, but allowed by Google), all of the imported tasks in that tasklist will be added to ONE of those duplicate tasklists.
+            </li>
+        </ul>
     </div>
+    
     <a name="Table1"></a>
     <table border="1" cellpadding="5">
-        <caption class="heading" >Table 2: Import file format</caption>
+        <caption class="heading" >Table 1: Import file format</caption>
         <tr>
             <th>
                 Column name
@@ -378,6 +303,98 @@
         </div>    
     </div>
     
+    <hr>
+    
+    <h2>Background information about Google Tasks data</h2>
+    
+    
+    <div class="break">
+        Note that this information is based on my own discoveries and conclusions as at 27 Feb 2012. I hope that this information helps people, but I cannot guarantee the accuracy or completeness of this information. Note also that Google may change their specifications, in which case this information may be out of date.
+    </div>
+    
+    <h3>Understanding tasks data</h3>
+    
+    <div class="break">
+        Most of the task properties are self-explanatory, however the relationship between <span class="property-name">status</span>, <span class="property-name">hidden</span> and <span class="property-name">deleted</span> may require some additional explanation.
+        <ul>
+            <li>
+                Mark a task complete ==> <span class="property-name">status</span> changes from "needsAction" to "completed".
+                <ul>
+                    <li>Task remains visible in [My Order] and [Sort by date] views.</li>
+                </ul>
+            </li>
+            <li>
+                Mark a task complete, and then click [Clear completed] ==> <span class="property-name">status</span> = "completed", <span class="property-name">hidden</span> = "True"
+                <ul>
+                    <li>
+                         Task only appears in [Completed tasks] view
+                    </li>
+                </ul>
+            </li>
+            <li>
+                Mark a task complete, and then click [Delete] ==> <span class="property-name">status</span> = "completed", <span class="property-name">deleted</span> = "True"
+                <ul>
+                    <li>
+                        Task only appears in [Trash] view <span class="take-note-smaller">(<a href="#notes">Note</a> 2)</span>
+                    </li>
+                </ul>
+            </li>
+            
+        </ul>
+    </div>
+
+
+    <div class="break">
+        <a name="Table2">Table 2 lists the various states and the corresponding task property values.</a>
+    </div>
+
+    <table border="1" cellpadding="5">
+        <caption class="heading" >Table 2: Task states</caption>
+        <tr>
+            <th colspan="3">Task properties <span class="take-note-smaller">(<a href="#notes">Note</a> 1 )</span></th><th rowspan="2">Description</th><th colspan="3">Visible in View:</th>
+        </tr>
+        <tr>
+            <th><span class="property-name">status</span></th>
+            <th><span class="property-name">deleted</span></th>
+            <th><span class="property-name">hidden</span></th>
+            <th class="view-tr">My order<br />Sort by date</th>
+            <th class="view-tr">Completed tasks</th>
+            <th class="view-tr">Trash<br/><span class="take-note-smaller">(<a href="#notes">Note</a> 2)</span></th>
+        </tr>
+        
+        <tr>
+            <td>needsAction</td><td></td><td></td><td>To be completed, visible in main window</td><td>Yes</td><td>No</td><td>No</td>
+        </tr>
+        <tr>
+            <td>completed</td><td></td><td></td><td>Marked complete, before clicking [Clear completed]</td><td>Yes</td><td>Yes</td><td>No</td>
+        </tr>
+        <tr>
+            <td>completed</td><td></td><td>True</td><td>Marked complete, after clicking [Clear completed]</td><td>No</td><td>Yes</td><td>No</td>
+        </tr>
+        <tr>
+            <td>needsAction</td><td>True</td><td></td><td>Deleted incomplete task. Visible only in [Trash]</td><td>No</td><td>No</td><td>Yes</td>
+        </tr>
+        <tr>
+            <td>completed</td><td>True</td><td></td><td>Deleted completed task. Visible only in [Trash]</td><td>No</td><td>No</td><td>Yes</td>
+        </tr>
+        <tr>
+            <td>needsAction</td><td>True</td><td>True</td> <td class="not-valid" colspan="4"> ======= Not valid =======</td>
+        </tr>
+        <tr>
+            <td>needsAction</td><td></td><td>True</td><td class="not-valid" colspan="4"> ======= Not valid =======</td>
+        </tr>
+        <tr>
+            <td>completed</td><td>True</td><td>True</td>   <td class="not-valid" colspan="4"> ======= Not valid =======</td>
+        </tr>
+    </table>
+ 
+    <div class="break">
+    </div>
+ 
+    <h3>Other problems</h3>
+    <div class="break">
+        The <span class="property-name">completed</span> property has occassionally contained invalid timestamps, where the year is stored as a large negative number such as -1701567. In this case, the application sets the <span class="property-name">completed</span> property to "1900-01-01 00:00:00"
+    </div>
     
     <div class="heading">
         <a name="notes">Notes</a>
@@ -388,7 +405,7 @@
                 Note 1 - 
             </td>
             <td>
-                <span class="take-note">CAUTION:</span> The Outlook, RTM and iCalendar file formats do not have fields for <span class="property-name">deleted</span> or <span class="property-name">hidden</span>, so those programs will display deleted and/or hidden tasks as normal tasks. Unless you have a specific reason, Do not include <span class="take-note">deleted</span> and <span class="take-note">hidden</span> tasks when downloading for applications such as Outlook, RTM or iCalendar.
+                All 3 properties are stored by Google as strings. The <span class="property-name">status</span> field may be either "needsAction" or "completed". The <span class="property-name">deleted</span> and <span class="property-name">hidden</span> properties can be either an empty string (indicating false), or the word "True".
             </td>
         </tr>
         <tr>
@@ -396,46 +413,24 @@
                 Note 2 - 
             </td>
             <td>
-                All 3 properties are stored by Google as strings. The <span class="property-name">status</span> field may be either "needsAction" or "completed". The <span class="property-name">deleted</span> and <span class="property-name">hidden</span> properties can be either an empty string (indicating false), or the word "True".
-            </td>
-        </tr>
-        <tr>
-            <td class="note-heading-smaller">
-                Note 3 - 
-            </td>
-            <td>
                 When tasks are deleted, they are marked as Hidden and moved to the [Trash] view.
                 <br/>
                 According to Google, deleted tasks stay in the Trash (deleted = True) for "some period of time" and are then auto deleted. I have noticed deleted task up to six months old. There does not appear to be any way to force a task to be actually deleted. That is, the Trash bin cannot be emptied by the user.
             </td>
         </tr>
-        <tr>
-            <td class="note-heading-smaller">
-                Note 4 - 
-            </td>
-            <td>
-                <span class="take-note">CAUTION:</span> Sometimes, tasks can become corrupted, leaving an invalid <span class="property-name">parent</span> value. These tasks still exist in the Google Tasks database, although Google does not display them.
-                <div class="small-break">
-                </div>
-                When a sub-task is deleted or hidden, the sub-task retains the <span class="property-name">parent</span> value, so that Google can restore the task to the correct parent. However, that <span class="property-name">parent</span> value may be invalid for a task that has been deleted or hidden, or whose parent was hidden, deleted or moved whilst the subtask was deleted. It may even refer to a task in another tasklist!
-                <div class="small-break">
-                </div>
-                One common way that tasks become corrupted is;
-                <ol>
-                    <li>Start with nested tasks A/B/C/D</li>
-                    <li>Delete D</li>
-                    <li>Delete C</li>
-                    <li>Restore D from Trash</li>
-                </ol>
-                Since task D's parent no longer exists, Google doesn't know where to put the task,
-                so it becomes an (invisible) orphan. There is an option to attempt to identify and display invalid/corrupted tasks.
-            </td>
-        </tr>
     </table>
 
+        
     <div class="break">
     </div>
- 
+    
+    <hr>
 
+        <div class="break">
+        Icons thanks to <a href="http://www.visualpharm.com/">Visual Pharm</a>, <a href="http://www.iconarchive.com/show/sleek-xp-software-icons-by-deleket/Windows-Close-Program-icon.html">Deleket</a> and <a href="http://www.gettyicons.com/free-icon/133/shimmer-icon-set/free-warning-icon-png/">Creative Freedom</a>
+        </div>
+        <div class="break">
+            Popup windows thanks to <a href="http://yensdesign.com/2008/09/how-to-create-a-stunning-and-smooth-popup-using-jquery/">yendesign</a>
+        </div>
   </body>
 </html>

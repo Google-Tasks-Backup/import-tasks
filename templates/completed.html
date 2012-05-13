@@ -2,7 +2,9 @@
 <html>
     <head>
         <title>{{ app_title }}</title>
-        <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css"></link>
+        <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css" />
+        <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
+        <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
         <script type="text/javascript">
 
           var _gaq = _gaq || [];
@@ -24,6 +26,9 @@
             </div>
         {% endif %}
 
+
+        <h2>{{ app_title }}</h2>
+  
         {% if is_authorized %}
           <div class="break">
             An email has been sent to {{ user_email }} (the account that you used when you authorised). Note that it can take some time (several minutes) for the email to arrive.

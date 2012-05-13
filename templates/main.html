@@ -1,0 +1,357 @@
+{% comment %}
+Copyright 2011 Google Inc.  All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+
+This is the Django template for the landing page.
+{% endcomment %}
+<!doctype html>
+<html>
+    <head>
+        <title>{{ app_title }}</title>
+        <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css" />
+        <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
+        <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+        <script type="text/javascript" src="/static/jquery.js"></script>
+        <script type="text/javascript" src="/static/popup.js"></script>
+        <script type="text/javascript">
+
+            function disableButton() {
+                document.getElementById("start_backup").value = "Starting backup (this may take several minutes) ...";
+                document.getElementById("start_backup").innerHTML = "Starting backup (this may take several minutes) ...";
+                document.getElementById("start_backup").disabled = true;
+            }
+            
+            function uploadFile() {
+                setDateFields();
+                // Get a fresh blobstore URL
+                // From http://stackoverflow.com/questions/6203089/stop-blob-url-from-expiring
+                $.get("{{ new_blobstore_url }}", function(data){
+                    $("#selectFileForm").attr('action', data);
+                    $("#selectFileForm").submit();
+                    $("#select_file").attr('disabled', 'true');
+                    $("#actionMsg").html('<div style="margin:45px; text-align: center;"><span  style="font-weight: bold; font-size: 200%;">Please wait, uploading file to server ...</span><br /><span  style="font-weight: bold; text-align: center;">This may take several minutes, depending on the size of your file and the speed of your connection.</span></div>');
+                }); 
+            }
+            
+            function setDateFields() {
+                var today = new Date();
+                year = today.getFullYear();
+                month = today.getMonth();
+                day = today.getDate();
+                hr = today.getHours();
+                min = today.getMinutes();
+                sec = today.getSeconds();
+                yearStr = "0000" + year.toString();
+                yearStr = yearStr.substring(yearStr.length - 4);
+                monthStr = "00" + (month + 1).toString();
+                monthStr = monthStr.substring(monthStr.length -2);
+                dayStr = "00" + day.toString();
+                dayStr = dayStr.substring(dayStr.length - 2);
+                hrStr = "00" + hr.toString();
+                hrStr = hrStr.substring(hrStr.length - 2);
+                minStr = "00" + min.toString();
+                minStr = minStr.substring(minStr.length - 2);
+                secStr = "00" + sec.toString();
+                secStr = secStr.substring(secStr.length - 2);
+                document.getElementById("import_timestamp_suffix").value = yearStr + "-" + monthStr + "-" + dayStr + " " +
+                    hrStr + ":" + minStr + ":" + secStr;
+            }
+            
+        </script>
+        <script type="text/javascript">
+
+          var _gaq = _gaq || [];
+          _gaq.push(['_setAccount', 'UA-30118203-1']);
+          _gaq.push(['_trackPageview']);
+
+          (function() {
+            var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+            ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+            var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+          })();
+
+        </script>
+    </head>
+
+<body>
+
+{% if is_authorized %}
+    <div class="usertitle">
+        Authorised user: {{ user_email }} <span class="logout-link">[ <a href="{{ logout_url }}">Log out</a> ]</span>
+    </div>
+    {% if is_admin_user %}
+        <div class="break usertitle">
+            <a href="{{ manage_blobstore_url }}">Manage Blobstores</a>
+        </div>
+    {% endif %}
+{% endif %}
+
+    <h2>{{ app_title }}</h2>
+  
+    <noscript>
+        <br />
+        <h3>Javascript must be enabled to use this site</h3>
+        <br />
+    </noscript>
+    
+    {% if host_msg %}
+        <div class="break">
+        <h3>{{ host_msg }}</h3>
+        </div>
+    {% endif %}
+
+        <form 
+            id="selectFileForm" 
+            action="/dummy" 
+            method="POST"
+            enctype="multipart/form-data">
+            
+            <!-- Timestamp is used as tasklist name suffix when creating new import taskslist -->
+            <input type="hidden" id="import_timestamp_suffix" name="import_timestamp_suffix" value="0001-01-01 00:00:00" />
+            
+			<fieldset>
+				<legend>
+                    Import tasks from CSV file
+                    <img class="popupTrigger" id="help-import" src="/static/help.png" alt="Display help">
+                </legend>
+                <div class="popupContent" id="help-import-content">
+                    <img class="popupClose" border="0" src="/static/close.png" alt="Close">
+                    <img class="clear" src="/static/warning_32.png" alt="Display warning">
+                    <div class="clear medium-break">
+                        The import option can only process CSV files that have been specifically formatted for importing into {{ app_title }}, such as those that have been exported using the "Import/Export CSV" file format.
+                    </div>
+                    <div class="medium-break">
+                        <span style="color:red;">CAUTION:</span> Attempting to upload any other file format (such as Outlook), will fail, and may even corrupt your existing tasks!
+                    </div>
+                    <div class="medium-break">
+                        For details of the import file format, refer to the <a href="/static/info.html#import_export_description">information page</a>
+                    </div>
+                </div>
+                
+                
+                <table  cellspacing="0" class="format-selection">
+                    <tr>
+                        <td class="format-name">
+                            <input type="radio" name="import_method" value="{{ APPEND_TIMESTAMP }}" class="radio-button-left" checked="checked">
+                            {{ APPEND_TIMESTAMP }}
+                        </td>
+                        <td>
+                            Append datetime to imported tasklist names</input> i.e., <span class="fixed-font smaller-font">"My Tasklist"</span> becomes <span class="fixed-font smaller-font">"My Tasklist 2012-01-31 19:37:04"</span>
+                        </td>
+                    </tr>
+					<tr>
+						<td class="format-name">
+                            <input type="radio" name="import_method" value="{{ USE_OWN_SUFFIX }}" id="use_own_suffix" class="radio-button-left" >
+                            {{ USE_OWN_SUFFIX }}
+						</td>
+						<td>
+                            Append your own suffix <input id="user_suffix" name="user_suffix" type="text" onfocus="javascript:document.getElementById('use_own_suffix').checked=true;" />
+                            <img class="popupTrigger" id="help-USE_OWN_SUFFIX" src="/static/help.png" alt="Display help">
+                            <div class="popupContent" id="help-USE_OWN_SUFFIX-content">
+                                <img class="popupClose" src="/static/close.png" alt="Close">
+                                <div class="clear">
+                                    For each tasklist in the imported data, create a new tasklist (with the suffix)
+                                    containing only the imported tasks for that tasklist.
+                                </div>
+                                <div class="medium-break">
+                                    For example, if the imported task is in a tasklist name "Shopping" and you choose a suffix "New", 
+                                    the task will be imported into a new tasklist named "ShoppingNew". 
+                                </div>
+                                <div class="comment medium-break">
+                                    Note that no space is added, to allow direct concatenation. If you wish to have a space between the existing
+                                    tasklist name and the suffix, then include that space in the start of the suffix field.
+                                </div>
+                                <div class="medium-break">
+                                    NOTE: Google allows duplicate tasklists names. If a tasklist already exists with the new name (e.g., "ShoppingNew"),
+                                    the import process will simply create another tasklist called "ShoppingNew", which will contain all the imported tasks
+                                    that were in the "Shopping" tasklist. Existing tasklists will not be altered.
+                                </div>
+                            </div>
+						</td>
+					</tr>
+					<tr>
+						<td class="format-name">
+                            <input type="radio" name="import_method" value="{{ ADD_TO_EXISTING_TASKLIST }}" class="radio-button-left" >
+                            {{ ADD_TO_EXISTING_TASKLIST }}
+						</td>
+						<td>
+                            Add imported tasks to existing tasklist. 
+                            <img class="popupTrigger" id="help-ADD_TO_EXISTING_TASKLIST" src="/static/help.png" alt="Display help">
+                            <div class="popupContent" id="help-ADD_TO_EXISTING_TASKLIST-content">
+                                <img class="popupClose" src="/static/close.png" alt="Close">
+                                <div class="clear">
+                                    For each tasklist in the imported data;
+                                    <ol>
+                                        <li>
+                                            If the tasklist for an imported tasks already exists;
+                                            <ul>
+                                                <li>
+                                                    Imported tasks will be inserted at the top of the list (that is, before existing tasks in the Google tasks view).
+                                                </li>
+                                                <li>
+                                                    NOTE: All tasks in the imported data will be created, even if that task already exists. (It is not possible to check for duplicate tasks.)
+                                                </li>
+                                            </ul>
+                                        <li>
+                                            If the tasklist does not exist;
+                                            <ul>
+                                                <li>
+                                                    Create a new tasklist containing only the imported tasks.
+                                                </li>
+                                            </ul>
+                                        </li>
+                                    </ol>
+                                </div>
+                            </div>
+						</td>
+					</tr>
+					<tr>
+						<td class="format-name">
+                            <input type="radio" name="import_method" value="{{ REPLACE_TASKLIST_CONTENT }}" class="radio-button-left" />
+                            {{ REPLACE_TASKLIST_CONTENT }}
+						</td>
+						<td>
+                            Replace tasklist content with imported tasks. 
+                            <img class="popupTrigger" id="help-REPLACE_TASKLIST_CONTENT" src="/static/help.png" alt="Display help">
+                            <div class="popupContent" id="help-REPLACE_TASKLIST_CONTENT-content">
+                                <img class="popupClose" src="/static/close.png" alt="Close">
+                                <div class="clear medium-break">
+                                    For each tasklist in the imported data;
+                                    <ul class="no-bullets">
+                                        <li>
+                                            If a tasklist with the same name exists, delete the existing tasklist (and all the tasks in it).
+                                            <div class="comment medium-break">
+                                                Note that if multiple tasklists exist with the same name, only ONE of those tasklists will be deleted.
+                                                There will therefore still be multiple tasklists with the same name after the import.
+                                            </div>
+                                        </li>
+                                        <li>
+                                            Create a new tasklist containing only the imported tasks.
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+						</td>
+					</tr>
+					<tr>
+						<td class="format-name">
+                            <input type="radio" name="import_method" value="{{ SKIP_DUPLICATE_TASKLIST }}" class="radio-button-left" />
+                            {{ SKIP_DUPLICATE_TASKLIST }}
+						</td>
+						<td>
+                            If tasklist with the same name exists, do not import tasks from that tasklist. 
+                            <img class="popupTrigger" id="help-SKIP_DUPLICATE_TASKLIST" src="/static/help.png" alt="Display help">
+                            <div class="popupContent" id="help-SKIP_DUPLICATE_TASKLIST-content">
+                                <img class="popupClose" src="/static/close.png" alt="Close">
+                                <div class="clear break">
+                                    Tasks will only be imported for tasklists that do NOT exist.
+                                </div>
+                                <div class="break">
+                                    For each tasklist in the imported data;
+                                    <ul>
+                                        <li>
+                                            If a tasklist exists with the same name as the task to be imported, skip importing for that tasklist. 
+                                            That is, do not import tasks for a tasklist if a tasklist with that name already exists. 
+                                        </li>
+                                        <li>
+                                            If the tasklist does not exist, create a new tasklist containing only the imported tasks.
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+						</td>
+					</tr>
+					<tr>
+						<td class="format-name">
+                            <input type="radio" name="import_method" value="{{ DELETE_BEFORE_IMPORT }}" class="radio-button-left" />
+                            {{ DELETE_BEFORE_IMPORT }}
+						</td>
+						<td>
+                            Delete ALL existing tasklists before importing.
+                            <img class="popupTrigger" id="help-DELETE_BEFORE_IMPORT" src="/static/help.png" alt="Display help">
+                            <img class="popupTrigger" id="help-DELETE_BEFORE_IMPORT" src="/static/warning.png" alt="Display warning">
+                            <div class="popupContent" id="help-DELETE_BEFORE_IMPORT-content">
+                                <img class="popupClose" src="/static/close.png" alt="Close">
+                                <img src="/static/warning_32.png" alt="Display warning">
+                                <ul class="clear">
+                                    <li>
+                                        <span style="color:red;">WARNING:</span> Choosing this option means that ALL existing tasklists (and their contents) will be deleted!
+                                        <ul>
+                                            <li>
+                                                NOTE: Google does not allow the default tasklist to be deleted.
+                                                The default tasklist is usually named "Default List" or
+                                                "My account name list", but can have any name. It is not necessarily the first tasklist in the list of tasklists. 
+                                            </li>
+                                            <li>
+                                                The default tasklist will be renamed with a unique name, but the contents of the default list will not be modified.
+                                            </li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        For each tasklist in the imported data, create a new tasklist containing only the imported tasks.
+                                    </li>
+                                </ul>
+                            </div>
+						</td>
+					</tr>
+                
+                </table>
+                
+                <div class="select-import-file">
+                    <span class="take-note-larger">Select CSV file to upload:</span>
+                    <img class="popupTrigger" id="help-import" src="/static/warning.png" alt="Display warning">
+                    <input type="file" size="100" id="select_file" name="file" onchange="uploadFile();">
+                    <div class="nice-gap-top" id="actionMsg">The file must be in the format produced by the {{ app_title }} "Import/Export CSV" format
+                    <span class="smaller-font">(Refer to the <a href="/static/info.html#import_export_description">information page</a> for details)</span>
+                    </div>
+                </div>
+                <div class="select-import-file">
+                When you select a file, the contents of that file is uploaded to the server. The amount of time required to upload the file depends on the size of the file, and the uplink speed of your Internet connection. For example, a 5MB file could take up to 2 minutes to upload on a 8192/64 ADSL link. {{ app_title }} cannot show upload progress, as the upload is managed by the browser.
+                </div>
+                <div class="select-import-file">
+                    Once the file has been uploaded, you will be redirected to a page which will update regularly to show progress of the background task
+                    as it creates tasks from the imported data. The amount of time taken to process the imported data depends on various factors, including server load and the total number of tasks. If the server is heavily loaded, it can take up to 1 second per task, so please be patient!
+                </div>
+            </fieldset>
+        </form>
+                    <br />
+
+	<div class="project-footer">
+        <div class="break">
+            Version {{ app_version }} ({{ upload_timestamp }})
+        </div>
+		<div class="break">
+			Questions or comments? Go to <a href="http://{{ url_discussion_group }}">{{ url_discussion_group }}</a>
+			or email <a href="mailto:{{ email_discussion_group }}">{{ email_discussion_group }}</a>
+		</div>
+		<div class="break">
+			Please report bugs or suggest improvements at <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a>
+		</div>
+		<div class="break">
+			Source code for this project is at <a href="http://{{ url_source_code }}">{{ url_source_code }}</a>
+		</div>
+        <div class="break">
+            {{ app_title }} uses cookies for two purposes;
+            <ul>
+                <li>To track your authorisation credentials between pages. This ensure that you (and only you) can get the results of your backup request.</li>
+                <li><a href="http://www.google.com/analytics/">Google Analytics</a> is used to track usage such as; number of unique visitors, location, browser type, operating system. </li>
+            </ul>
+        </div>
+	</div>
+    
+	<div class="backgroundPopup"></div>
+
+</body>
+</html>

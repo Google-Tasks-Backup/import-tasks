@@ -16,7 +16,7 @@
 
 # Original __author__ = "dwightguth@google.com (Dwight Guth)"
 
-"""Google Tasks Backup configuration file."""
+"""Import Google Tasks configuration file."""
 
 __author__ = "julie.smith.1999@gmail.com (Julie Smith)"
 
