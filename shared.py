@@ -16,11 +16,19 @@
 #
 # Original Google Tasks Porter, modified by Julie Smith 2012
 
+# This module contains code whis is common between classes, or between tasks-backup.py and worker.py
+# Can't use the name common, because there is already a module named common
+
 from apiclient.oauth2client import appengine
 from google.appengine.api import users
 from google.appengine.api import logservice # To flush logs
 from google.appengine.ext import db
 from google.appengine.api import memcache
+from google.appengine.api import taskqueue
+from google.appengine.ext import webapp
+from google.appengine.ext.webapp import template
+from google.appengine.ext import blobstore
+from google.appengine.api import logservice # To flush logs
 
 from apiclient.oauth2client import client
 from apiclient import discovery
@@ -29,19 +37,23 @@ from apiclient import discovery
 from apiclient import errors as apiclient_errors
 
 
-
+import pickle
 import httplib2
 import Cookie
 import cgi
 import sys
+import os
 import traceback
 import logging
-import pickle
-import model
+import datetime
+from datetime import timedelta
 
-# Project-specific settings, used by get_settings
+
+# Project-specific imports
+import model
 import settings
 import constants
+import appversion # appversion.version is set before the upload process to keep the version number consistent
 
 
 logservice.AUTOFLUSH_EVERY_SECONDS = 5
@@ -49,11 +61,8 @@ logservice.AUTOFLUSH_EVERY_BYTES = None
 logservice.AUTOFLUSH_EVERY_LINES = 5
 logservice.AUTOFLUSH_ENABLED = True
 
-# Shared functions
-# Can't use the name common, because there is already a module named common
-
 class DailyLimitExceededError(Exception):
-    """ Thrown by _get_credentials() when HttpError indicates that daily limit has been exceeded """
+    """ Thrown by get_credentials() when HttpError indicates that daily limit has been exceeded """
     
     msg = "Daily limit exceeded. Please try again after midnight Pacific Standard Time."
     
@@ -65,14 +74,111 @@ class DailyLimitExceededError(Exception):
         return msg;
     
 
-def __set_cookie(res, key, value='', max_age=None,
+def send_job_to_worker(self, process_tasks_job):
+    """ Place the import job details on the taskqueue, so that the worker can proceess the uploaded data.
+        The job may be a new import, or the continuation of a previously started job (using previously uploaded file).
+    
+        When job has been added to taskqueue, user is redirected to Progress page.
+    
+        This method is first called from BlobstoreUploadHandler.post()
+        It is possible for retrieving credentials to fail. If that happens, the user is redirected to authorise,
+        and the OAuthCallbackHandler() redirects to the BlobstoreUploadHandler URL as a GET.
+        This method is then called from the get() handler.
+    """
+
+    fn_name = "send_job_to_worker() "
+    
+    logging.debug(fn_name + "<Start>")
+    logservice.flush()
+    
+    try:
+        # Make sure that we can get valid credentials for the user before starting the worker
+        ok, user, credentials, fail_msg, fail_reason = get_credentials(self)
+        if not ok:
+            # User not logged in, or no or invalid credentials
+            logging.info(fn_name + "Get credentials error: " + fail_msg)
+            logservice.flush()
+            redirect_for_auth(self, user)
+            return
+        
+        user_email = user.email()
+        
+        # ==========================================================
+        #       Create a Taskqueue entry to start the import
+        # ==========================================================
+        process_tasks_job.job_start_timestamp = datetime.datetime.now()
+        process_tasks_job.put()
+        
+        # Add the request to the tasks queue, passing in the user's email so that the task can access the database record
+        q = taskqueue.Queue(settings.PROCESS_TASKS_REQUEST_QUEUE_NAME)
+        t = taskqueue.Task(url=settings.WORKER_URL, params={settings.TASKS_QUEUE_KEY_NAME : user_email}, method='POST')
+        logging.debug(fn_name + "Adding task to " + str(settings.PROCESS_TASKS_REQUEST_QUEUE_NAME) + 
+            " queue, for " + str(user_email))
+        logservice.flush()
+        
+        try:
+            q.add(t)
+        except Exception, e:
+            logging.exception(fn_name + "Exception adding task to taskqueue")
+            logservice.flush()
+            
+            process_tasks_job.status = constants.ImportJobStatus.ERROR
+            process_tasks_job.message = ''
+            process_tasks_job.error_message = "Error starting import process: " + get_exception_msg(e)
+            process_tasks_job.job_progress_timestamp = datetime.datetime.now()
+            logging.debug(fn_name + "Job status: '" + str(process_tasks_job.status) + ", progress: " + 
+                str(process_tasks_job.total_progress) + ", msg: '" + 
+                str(process_tasks_job.message) + "', err msg: '" + str(process_tasks_job.error_message))
+            logservice.flush()
+            process_tasks_job.put()
+            
+            # Import process terminated, so delete the blobstore???
+            # blob_key = process_tasks_job.blobstore_key
+            # blob_info = blobstore.BlobInfo.get(blob_key)
+            # delete_blobstore(blob_info)
+            
+            serve_message_page(self, "Error creating tasks import job.",
+                "Please report the following error using the link below",
+                get_exception_msg(e))
+            
+            logging.debug(fn_name + "<End> (error adding job to taskqueue)")
+            logservice.flush()
+            return
+
+        logging.debug(fn_name + "Import job added to taskqueue. Redirect to " + settings.PROGRESS_URL + " for " + str(user_email))
+        logservice.flush()
+        
+        # Redirect to Progress page
+        self.redirect(settings.PROGRESS_URL)
+        
+    except DailyLimitExceededError, e:
+        logging.warning(fn_name + e.msg)
+        
+        serve_message_page(self, "Unable to import tasks - daily limit exceeded", 
+            "This application is running on my personal AppSpot account, which is limited by Google to a total of 5000 task updates per day. " +
+            "The daily quota is reset at midnight Pacific Standard Time (07:00 UTC, 5:00pm Australian Eastern Standard Time).",
+            "Please re-run any time after midnight PST to finish your import.")
+        logging.debug(fn_name + "<End> (Daily Limit Exceeded)")
+        logservice.flush()
+        
+    except Exception, e:
+        logging.exception(fn_name + "Caught top-level exception")
+        self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % get_exception_msg(e))
+        logging.debug(fn_name + "<End> due to exception" )
+        logservice.flush()
+
+    logging.debug(fn_name + "<End>")
+    logservice.flush()
+    
+    
+def set_cookie(res, key, value='', max_age=None,
                    path='/', domain=None, secure=None, httponly=False,
                    version=None, comment=None):
     """
     Set (add) a cookie for the response
     """
     
-    fn_name = "__set_cookie(): "
+    fn_name = "set_cookie(): "
     
     cookies = Cookie.SimpleCookie()
     cookies[key] = value
@@ -91,18 +197,24 @@ def __set_cookie(res, key, value='', max_age=None,
             cookies[key]['expires'] = max_age
     header_value = cookies[key].output(header='').lstrip()
     res.headers.add_header("Set-Cookie", header_value)
-    logging.debug(fn_name + "Writing cookie: " + str(key) + " = " + str(value))
+    logging.debug(fn_name + "Writing cookie: '" + str(key) + "' = '" + str(value) + "', max age = '" + str(max_age) + "'")
     logservice.flush()
-        
-        
-def _store_auth_retry_count(self, count):
-    __set_cookie(self.response, 'auth_retry_count', str(count), max_age=settings.AUTH_RETRY_COUNT_COOKIE_EXPIRATION_TIME)
-    
-def _reset_auth_retry_count(self):
-    __set_cookie(self.response, 'auth_retry_count', '0', max_age=settings.AUTH_RETRY_COUNT_COOKIE_EXPIRATION_TIME)
     
     
-def _redirect_for_auth(self, user, redirect_url=None):
+def delete_cookie(res, key):
+    logging.debug("Deleting cookie: " + str(key))
+    set_cookie(res, key, '', -1)
+    
+    
+def __store_auth_retry_count(self, count):
+    set_cookie(self.response, 'auth_retry_count', str(count), max_age=settings.AUTH_RETRY_COUNT_COOKIE_EXPIRATION_TIME)
+    
+    
+def __reset_auth_retry_count(self):
+    set_cookie(self.response, 'auth_retry_count', '0', max_age=settings.AUTH_RETRY_COUNT_COOKIE_EXPIRATION_TIME)
+    
+    
+def redirect_for_auth(self, user, redirect_url=None):
     """Redirects the webapp response to authenticate the user with OAuth2.
     
         Args:
@@ -111,10 +223,10 @@ def _redirect_for_auth(self, user, redirect_url=None):
     
         Uses the 'state' parameter to store redirect_url. 
         The handler for /oauth2callback can therefore redirect the user back to the page they
-        were on when _get_credentials() failed (or to the specified redirect_url).
+        were on when get_credentials() failed (or to the specified redirect_url).
     """
 
-    fn_name = "_redirect_for_auth(): "
+    fn_name = "redirect_for_auth(): "
     
     try:
         client_id, client_secret, user_agent, app_title, product_name, host_msg = get_settings(self.request.host)
@@ -157,7 +269,7 @@ def _redirect_for_auth(self, user, redirect_url=None):
             auth_retry_count = int(self.request.cookies['auth_retry_count'])
         else:
             auth_retry_count = 0
-        _store_auth_retry_count(self, auth_retry_count + 1)
+        __store_auth_retry_count(self, auth_retry_count + 1)
 
         logging.debug(fn_name + "Redirecting to " + str(authorize_url))
         logservice.flush()
@@ -170,7 +282,7 @@ def _redirect_for_auth(self, user, redirect_url=None):
         logservice.flush()
 
   
-def _get_credentials(self):
+def get_credentials(self):
     """ Retrieve credentials for the user
             
         Returns:
@@ -186,12 +298,12 @@ def _get_credentials(self):
                                     "Credential use HTTP error" (Returned an HTTP error when attempting to use credentials)
             
             
-        If no credentials, or credentials are invalid, the calling method can call _redirect_for_auth(self, user), 
+        If no credentials, or credentials are invalid, the calling method can call redirect_for_auth(self, user), 
         which sets the redirect URL back to the calling page. That is, user is redirected to calling page after authorising.
         
     """    
         
-    fn_name = "_get_credentials(): "
+    fn_name = "get_credentials(): "
     
     user = None
     fail_msg = ''
@@ -281,7 +393,7 @@ def _get_credentials(self):
        
         if result:
             # TODO: Successfuly retrieved credentials, so reset auth_retry_count to 0
-            _reset_auth_retry_count(self)
+            __reset_auth_retry_count(self)
         else:
             logging.debug(fn_name + fail_msg)
             logservice.flush()
@@ -298,9 +410,9 @@ def _get_credentials(self):
     return result, user, credentials, fail_msg, fail_reason
 
   
-def _serve_message_page(self, msg1, msg2 = None, msg3 = None, show_back_button=True):
+def serve_message_page(self, msg1, msg2 = None, msg3 = None, show_back_button=False):
     """ Serve message.html page to user with message, and (optionally) a Back button """
-    fn_name = "_serve_message_page: "
+    fn_name = "serve_message_page: "
 
     logging.debug(fn_name + "<Start>")
     logservice.flush()
@@ -323,11 +435,7 @@ def _serve_message_page(self, msg1, msg2 = None, msg3 = None, show_back_button=T
                            'msg2': msg2,
                            'msg3': msg3,
                            'show_back_button' : show_back_button,
-                           'url_home_page' : settings.MAIN_PAGE_URL,
                            'product_name' : product_name,
-                           'start_backup_url' : settings.START_BACKUP_URL,
-                           'url_main_page' : settings.MAIN_PAGE_URL,
-                           'logout_url': users.create_logout_url(settings.WELCOME_PAGE_URL),
                            'url_discussion_group' : settings.url_discussion_group,
                            'email_discussion_group' : settings.email_discussion_group,
                            'url_issues_page' : settings.url_issues_page,

@@ -77,11 +77,6 @@
   </head>
   
   <body>
-{% if is_authorized %}
-    <div class="usertitle">
-        Authorised user: {{ user_email }} <span class="logout-link">[ <a href="{{ logout_url }}">Log out</a> ]</span>
-    </div>
-{% endif %}
 
     <h2>{{ app_title }}</h2>
   

@@ -39,10 +39,12 @@ class ProcessTasksJob(db.Model):
         When creating an instance, the user's email address is used as the key
         
     """
+    
     user = db.UserProperty(indexed=False)
     
-    # A job can either be export (backup) or import
-    job_type = db.StringProperty(indexed=False, choices=('import', 'export'), default='export')
+    is_paused = db.BooleanProperty(indexed=False, default=False)
+    
+    pause_reason = db.StringProperty(indexed=False, choices=(constants.PauseReason.ALL_VALUES), default=constants.PauseReason.NONE)
     
     # Blobstore key for import job. The key is retrievable in the uploadhandler (i.e., when user uploads file)
     #       class UploadHandler(blobstore_handlers.BlobstoreUploadHandler):
@@ -52,6 +54,12 @@ class ProcessTasksJob(db.Model):
     #               blobstore_key = blobstore_info.key
     # CAUTION: The Blobstore is global across the app. The only way to tie a Blobstore to a user is through this Model!
     blobstore_key = db.StringProperty(indexed=False, default=None)
+    
+    # Name of the user's uploaded file. Used to display file details to user when giving the user the option to continue a job
+    file_name = db.StringProperty(indexed=False, default=None)
+    
+    # Time that the user uploaded the file. Used to display file details to user when giving the user the option to continue a job
+    file_upload_time = db.DateTimeProperty(indexed=False, auto_now_add=True)
     
     # The suffix is added to imported tasklist names to ensure unique tasklist names
     import_tasklist_suffix = db.StringProperty(indexed=False, default='')
@@ -68,11 +76,11 @@ class ProcessTasksJob(db.Model):
     
     # Set automatically when entity is created. Indicates when job was started (i.e., snapshot time)
     # Also used to track if task exceeds maximum allowed, so we can display message to user
-    job_start_timestamp = db.DateTimeProperty(auto_now_add=True, indexed=False)
+    job_start_timestamp = db.DateTimeProperty(indexed=False, auto_now_add=True)
     
     # Job status, to display to user and control web page and foreground app behaviour
     # status = db.StringProperty(indexed=False, choices=('starting', 'initialising', 'building', 'completed', 'importing', 'import_completed', 'error'), default='starting')
-    status = db.StringProperty(indexed=False, choices=(constants.JobStatus.ALL_VALUES), default=constants.JobStatus.STARTING)
+    status = db.StringProperty(indexed=False, choices=(constants.ImportJobStatus.ALL_VALUES), default=constants.ImportJobStatus.STARTING)
     
     # Total number of tasks backed up. Used to display progress to user. Updated when an entire tasklist has been backed up
     total_progress = db.IntegerProperty(indexed=False, default=0) 

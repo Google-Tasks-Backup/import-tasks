@@ -1,6 +1,6 @@
 # Any value, especially strings, that is referenced in more than one location.
 
-class JobStatus(object):
+class ImportJobStatus(object):
     # CAUTION: The Django progress.html template uses string literals when checking the status value. 
     # If these values are changed, then the progress.html must also be changed
     STARTING = 'Starting' # Job has been created (request places on task queue)
@@ -33,6 +33,12 @@ class ImportMethod(object):
     # Any of these methods require a new tasklist to be created
     CREATE_NEW_TASKLIST_VALUES = [APPEND_TIMESTAMP, USE_OWN_SUFFIX, REPLACE_TASKLIST_CONTENT, DELETE_BEFORE_IMPORT, SKIP_DUPLICATE_TASKLIST]
     
+class PauseReason(object):
+    NONE = ''
+    DAILY_LIMIT_EXCEEDED = "Daily limit exceeded"
+    USER_INTERRUPTED = "User interrupted import job"
+    
+    ALL_VALUES = [NONE, DAILY_LIMIT_EXCEEDED, USER_INTERRUPTED]
     
     
 # Max blob size is just under 1MB (~2^20), so use 1000000 to allow some margin for overheads

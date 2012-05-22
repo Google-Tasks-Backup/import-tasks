@@ -63,7 +63,7 @@ import csv
 import model
 import settings
 import appversion # appversion.version is set before the upload process to keep the version number consistent
-import shared # Code whis is common between tasks-backup.py and worker.py
+import shared # Code whis is common between classes, or between tasks-backup.py and worker.py
 import constants
 
 
@@ -85,7 +85,7 @@ class WelcomeHandler(webapp.RequestHandler):
         try:
             client_id, client_secret, user_agent, app_title, product_name, host_msg = shared.get_settings(self.request.host)
 
-            ok, user, credentials, fail_msg, fail_reason = shared._get_credentials(self)
+            ok, user, credentials, fail_msg, fail_reason = shared.get_credentials(self)
             if not ok:
                 is_authorized = False
                 is_admin_user = False
@@ -97,18 +97,6 @@ class WelcomeHandler(webapp.RequestHandler):
             if user:
                 user_email = user.email()
             
-            # if shared.isTestUser(user_email):
-                # logging.debug(fn_name + "Started by test user %s" % user_email)
-                
-                # try:
-                    # headers = self.request.headers
-                    # for k,v in headers.items():
-                        # logging.debug(fn_name + "browser header: " + str(k) + " = " + str(v))
-                        
-                # except Exception, e:
-                    # logging.exception(fn_name + "Exception retrieving request headers")
-                    
-              
             template_values = {'app_title' : app_title,
                                'host_msg' : host_msg,
                                'url_home_page' : settings.MAIN_PAGE_URL,
@@ -118,6 +106,7 @@ class WelcomeHandler(webapp.RequestHandler):
                                'is_admin_user' : is_admin_user,
                                'user_email' : user_email,
                                'url_main_page' : settings.MAIN_PAGE_URL,
+                               'manage_blobstore_url' : settings.ADMIN_MANAGE_BLOBSTORE_URL,
                                'msg': self.request.get('msg'),
                                'logout_url': users.create_logout_url(settings.WELCOME_PAGE_URL),
                                'url_discussion_group' : settings.url_discussion_group,
@@ -129,15 +118,17 @@ class WelcomeHandler(webapp.RequestHandler):
                                
             path = os.path.join(os.path.dirname(__file__), constants.PATH_TO_TEMPLATES, "welcome.html")
             self.response.out.write(template.render(path, template_values))
-            # logging.debug(fn_name + "Calling garbage collection")
-            # gc.collect()
             logging.debug(fn_name + "<End>" )
             logservice.flush()
 
         except shared.DailyLimitExceededError, e:
             logging.warning(fn_name + e.msg)
-            # TODO: Redirect to error page, with a meaningful message
-            self.response.out.write(e.msg)
+            # self.response.out.write(e.msg)
+            msg1 = "Daily limit exceeded"
+            msg2 = "This application is running on my personal AppSpot account, which is limited by Google to a total of 5000 task updates per day."
+            msg3 = "The daily quota is reset at midnight Pacific Standard Time (5:00pm Australian Eastern Standard Time, 07:00 UTC). " + \
+                "Please rerun any time after midnight PST to finish your import."
+            shared.serve_message_page(msg1, msg2, msg3)
             logging.debug(fn_name + "<End> (Daily Limit Exceeded)")
             logservice.flush()
             
@@ -150,10 +141,10 @@ class WelcomeHandler(webapp.RequestHandler):
     
     
 class MainHandler(webapp.RequestHandler):
-    """Handler for /."""
+    """ Handles Main web page, which provides user with option to start/continue an import job. """
 
     def get(self):
-        """Handles GET requests for /."""
+        """ Main page, once user has been authenticated """
 
         fn_name = "MainHandler.get(): "
 
@@ -161,26 +152,63 @@ class MainHandler(webapp.RequestHandler):
         logservice.flush()
         
         try:
-            # DEBUG
-            # if self.request.cookies.has_key('auth_retry_count'):
-                # logging.debug(fn_name + "Cookie: auth_retry_count = " + str(self.request.cookies['auth_retry_count']))
-            # else:
-                # logging.debug(fn_name + "No auth_retry_count cookie found")
-            # logservice.flush()            
                 
             client_id, client_secret, user_agent, app_title, product_name, host_msg = shared.get_settings(self.request.host)
 
             # Make sure that we can get the user's credentials before we allow them to start an import job
-            ok, user, credentials, fail_msg, fail_reason = shared._get_credentials(self)
+            ok, user, credentials, fail_msg, fail_reason = shared.get_credentials(self)
             if not ok:
                 # User not logged in, or no or invalid credentials
                 logging.info(fn_name + "Get credentials error: " + fail_msg)
                 logservice.flush()
                 # self.redirect(settings.WELCOME_PAGE_URL)
-                shared._redirect_for_auth(self, user)
+                shared.redirect_for_auth(self, user)
                 return
                 
             user_email = user.email()
+            
+            # Retrieve the DB record for this user
+            process_tasks_job = model.ProcessTasksJob.get_by_key_name(user_email)
+            
+            file_upload_time = None
+            file_name = None
+            job_status = None
+            total_progress = 0
+            total_num_rows_to_process = 0
+            import_in_progress = False
+            found_paused_job = False
+            if process_tasks_job:
+                job_status = process_tasks_job.status
+                logging.debug(fn_name + "Retrieved process tasks job for " + str(user_email) +
+                    ", status = " + str(job_status))
+                logservice.flush()
+                
+                if job_status in constants.ImportJobStatus.PROGRESS_VALUES:
+                    import_in_progress = True
+                    logging.debug(fn_name + "Import job in progress")
+                    logservice.flush()
+                
+                if process_tasks_job.is_paused:
+                    found_paused_job = True
+                    file_upload_time = process_tasks_job.file_upload_time
+                    file_name = process_tasks_job.file_name
+                    total_num_rows_to_process = process_tasks_job.total_num_rows_to_process
+                    total_progress = process_tasks_job.total_progress
+                    logging.debug(fn_name + "Found paused import job")
+                    logservice.flush()
+
+                # DEBUG
+                # found_paused_job = True
+                # file_upload_time = datetime.datetime.now()
+                # file_name = "Dummy file name.csv"
+                # total_num_rows_to_process = 8197
+                # total_progress = 1943
+                # logging.debug(fn_name + "DEBUG: Found paused import job")
+                # logservice.flush()
+            
+            
+            
+            
             is_admin_user = users.is_current_user_admin()
             
             is_authorized = True
@@ -214,6 +242,13 @@ class MainHandler(webapp.RequestHandler):
                                'product_name' : product_name,
                                'is_authorized': is_authorized,
                                'is_admin_user' : is_admin_user,
+                               'job_status' : job_status,
+                               'import_in_progress' : import_in_progress,
+                               'found_paused_job' : found_paused_job,
+                               'file_upload_time' : file_upload_time,
+                               'total_num_rows_to_process' : total_num_rows_to_process,
+                               'total_progress' : total_progress,
+                               'file_name' : file_name,
                                'manage_blobstore_url' : settings.ADMIN_MANAGE_BLOBSTORE_URL,
                                'user_email' : user_email,
                                'msg': self.request.get('msg'),
@@ -240,7 +275,12 @@ class MainHandler(webapp.RequestHandler):
             
         except shared.DailyLimitExceededError, e:
             logging.warning(fn_name + e.msg)
-            self.response.out.write(e.msg)
+            # self.response.out.write(e.msg)
+            msg1 = "Daily limit exceeded"
+            msg2 = "This application is running on my personal AppSpot account, which is limited by Google to a total of 5000 task updates per day."
+            msg3 = "The daily quota is reset at midnight Pacific Standard Time (5:00pm Australian Eastern Standard Time, 07:00 UTC). " + \
+                "Please rerun any time after midnight PST to finish your import."
+            shared.serve_message_page(msg1, msg2, msg3)
             logging.debug(fn_name + "<End> (Daily Limit Exceeded)")
             logservice.flush()
                         
@@ -251,7 +291,63 @@ class MainHandler(webapp.RequestHandler):
             logservice.flush()
     
     
+
+class ContinueImportJob(webapp.RequestHandler):
+
+    def get(self):
+        
+        fn_name = "ContinueImportJob.get(): "
+            
+        logging.debug(fn_name + "<Start>")
+        logservice.flush()
     
+        # Check that job record exists, and is in correct state to continue
+        try:
+            # Only get the user here. The credentials are retrieved within send_job_to_worker()
+            # Don't need to check if user is logged in, because all pages (except '/') are set as secure in app.yaml
+            user = users.get_current_user()
+            user_email = user.email()
+            # Retrieve the import job record for this user
+            process_tasks_job = model.ProcessTasksJob.get_by_key_name(user_email)
+            
+            if process_tasks_job is None:
+                logging.error(fn_name + "No DB record for " + user_email)
+                shared.serve_message_page(self, "No import job found.",
+                    "If you believe this to be an error, please report this at the link below, otherwise",
+                    """<a href="/main">start an import</a>""")
+                logging.warning(fn_name + "<End> No DB record")
+                logservice.flush()
+                return
+            
+            if not process_tasks_job.is_paused:
+                shared.serve_message_page(self, "No paused import job found",
+                    "If you believe this to be an error, please report this at the link below, otherwise",
+                    "<a href=" + settings.MAIN_PAGE_URL + ">Go to main menu</a>")
+                logging.warning(fn_name + "<End> Job is not paused. Status: " + str(process_tasks_job.status))
+                logservice.flush()
+                return
+                
+            # --------------------------------------------------------
+            #       Add job to taskqueue for worker to process
+            # --------------------------------------------------------
+            # Worker will continue the paused job
+            logging.debug(fn_name + "Continuing paused job")
+            shared.send_job_to_worker(self, process_tasks_job)
+            
+            
+            
+        except Exception, e:
+            logging.exception(fn_name + "Caught top-level exception")
+            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % shared.get_exception_msg(e))
+            logging.debug(fn_name + "<End> due to exception" )
+            logservice.flush()
+
+    
+        logging.debug(fn_name + "<End>")
+        logservice.flush()
+        
+        
+
 class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
     """ Handle Blobstore uploads """
     
@@ -260,7 +356,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
         
             This can happen if retrieving credentials fails when handling the Blobstore upload.
             
-            In that case, shared._redirect_for_auth() stores the URL for the BlobstoreUploadHandler()
+            In that case, shared.redirect_for_auth() stores the URL for the BlobstoreUploadHandler()
             When OAuthCallbackHandler() redirects to here (on successful authorisation), it comes in as a GET
         """
         
@@ -270,7 +366,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
         logservice.flush()
         
         try:
-            # Only get the user here. The credentials are retrieved within start_import_job()
+            # Only get the user here. The credentials are retrieved within send_job_to_worker()
             # Don't need to check if user is logged in, because all pages (except '/') are set as secure in app.yaml
             user = users.get_current_user()
             user_email = user.email()
@@ -279,28 +375,31 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
             
             if process_tasks_job is None:
                 logging.error(fn_name + "No DB record for " + user_email)
-                shared._serve_message_page("No import job found.",
+                shared.serve_message_page(self, "No import job found.",
                     "If you believe this to be an error, please report this at the link below, otherwise",
                     """<a href="/main">start an import</a>""")
                 logging.warning(fn_name + "<End> No DB record")
                 logservice.flush()
                 return
             
-            if process_tasks_job.status != constants.JobStatus.STARTING:
+            if process_tasks_job.status != constants.ImportJobStatus.STARTING:
                 # The only time we should get here is if the credentials failed, and we were redirected after
                 # successfully authorising. In that case, the jab status should still be STARTING
-                shared._serve_message_page("Invalid job status: " + str(process_tasks_job.status),
+                shared.serve_message_page(self, "Invalid job status: " + str(process_tasks_job.status),
                     "Please report this error (see link below)")
                 logging.warning(fn_name + "<End> Invalid job status: " + str(process_tasks_job.status))
                 logservice.flush()
                 return
                 
-            self.start_import_job(process_tasks_job)
+            # --------------------------------------------------------
+            #       Add job to taskqueue for worker to process
+            # --------------------------------------------------------
+            shared.send_job_to_worker(self, process_tasks_job)
             
         except Exception, e:
             logging.exception(fn_name + "Caught top-level exception")
             self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % shared.get_exception_msg(e))
-            logging.error(fn_name + "<End> due to exception" )
+            logging.debug(fn_name + "<End> due to exception" )
             logservice.flush()
 
         logging.debug(fn_name + "<End>")
@@ -342,9 +441,11 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                     shared.delete_blobstore(blob_info)
                     logging.debug(fn_name + "<End> due to empty upload file")
                     logservice.flush()
-                    shared._serve_message_page(self, err_msg)
+                    shared.serve_message_page(self, err_msg, show_back_button=True)
                     return
                 
+                file_upload_time = blob_info.creation
+                file_name = str(blob_info.filename)
                 
                 # -------------------------------------------
                 #       Check if file format is valid
@@ -368,7 +469,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                             shared.delete_blobstore(blob_info)
                             logging.debug(fn_name + "<End> due to invalid header column names")
                             logservice.flush()
-                            shared._serve_message_page(self, err_msg1, err_msg2)
+                            shared.serve_message_page(self, err_msg1, err_msg2, show_back_button=True)
                             return
                             
                     if len(header_row) != 9:
@@ -379,7 +480,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                         shared.delete_blobstore(blob_info)
                         logging.debug(fn_name + "<End> due to invalid number of header columns")
                         logservice.flush()
-                        shared._serve_message_page(self, err_msg1, err_msg2)
+                        shared.serve_message_page(self, err_msg1, err_msg2, show_back_button=True)
                         return
                     
                     # --------------------------------
@@ -396,7 +497,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                         shared.delete_blobstore(blob_info)
                         logging.debug(fn_name + "<End> due to invalid number of data columns")
                         logservice.flush()
-                        shared._serve_message_page(self, err_msg1, err_msg2, err_msg3)
+                        shared.serve_message_page(self, err_msg1, err_msg2, err_msg3, show_back_button=True)
                         return
                     
                     
@@ -416,7 +517,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                         shared.delete_blobstore(blob_info)
                         logging.debug(fn_name + "<End> due to invalid depth value")
                         logservice.flush()
-                        shared._serve_message_page(self, err_msg)
+                        shared.serve_message_page(self, err_msg, show_back_button=True)
                         return 
                         
                         
@@ -427,7 +528,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                     shared.delete_blobstore(blob_info)
                     logging.debug(fn_name + "<End> due to insufficient data in file" )
                     logservice.flush()
-                    shared._serve_message_page(self, err_msg)
+                    shared.serve_message_page(self, err_msg, show_back_button=True)
                     return
 
                 except Exception, e:
@@ -438,7 +539,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                     shared.delete_blobstore(blob_info)
                     logging.debug(fn_name + "<End> due to error" )
                     logservice.flush()
-                    shared._serve_message_page(self, err_msg1, err_msg2)
+                    shared.serve_message_page(self, err_msg1, err_msg2, show_back_button=True)
                     return
                 
                 # Read the rest of the file so we know how many data rows there are
@@ -461,26 +562,30 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                 
                 # Create a DB record, using the user's email address as the key
                 # We store the job details here, but we add the credentials just before we add the
-                # job to the taskqueue in start_import_job(), so that the credentials are as fresh as possible.
+                # job to the taskqueue in send_job_to_worker(), so that the credentials are as fresh as possible.
                 process_tasks_job = model.ProcessTasksJob(key_name=user_email)
                 process_tasks_job.user = user
-                process_tasks_job.job_type = 'import'
                 process_tasks_job.total_num_rows_to_process = num_data_rows
                 process_tasks_job.blobstore_key = blob_key
+                process_tasks_job.file_name = file_name
+                process_tasks_job.file_upload_time = file_upload_time
                 process_tasks_job.import_tasklist_suffix = import_tasklist_suffix
                 process_tasks_job.import_method = import_method
-                process_tasks_job.status = constants.JobStatus.STARTING
+                process_tasks_job.status = constants.ImportJobStatus.STARTING
                 process_tasks_job.put()
                 
+                # --------------------------------------------------------
+                #       Add job to taskqueue for worker to process
+                # --------------------------------------------------------
                 # Try to start the import job now.
-                # start_import_job() will attempt to retrieve the user's credentials. If that fails, then
-                # the this URL will be called again as a GET, and we retry start_import_job() then
-                self.start_import_job(process_tasks_job)
+                # send_job_to_worker() will attempt to retrieve the user's credentials. If that fails, then
+                # this URL will be called again as a GET, and we retry send_job_to_worker() then
+                shared.send_job_to_worker(self, process_tasks_job)
     
             else:
                 logging.debug(fn_name + "<End> due to no file uploaded" )
                 logservice.flush()
-                shared._serve_message_page(self, 'No file uploaded, please try again.')
+                shared.serve_message_page(self, 'No file uploaded, please try again.', show_back_button=True)
                 
                 
         except Exception, e:
@@ -492,98 +597,8 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
         logging.debug(fn_name + "<End>")
         logservice.flush()
         
-        
-    def start_import_job(self, process_tasks_job):
-        """ Place the import job details on the taskqueue, so that the worker can proceess the uploaded data.
-        
-            This method is first called from BlobstoreUploadHandler.post()
-            It is possible for retrieving credentials to fail. If that happens, the user is redirected to authorise,
-            and the OAuthCallbackHandler() redirects to the BlobstoreUploadHandler URL as a GET.
-            This method is then called from the get() handler.
-        """
     
-        fn_name = "BlobstoreUploadHandler.start_import_job() "
-        
-        logging.debug(fn_name + "<Start>")
-        logservice.flush()
-        
-        try:
-            # Make sure that we can get valid credentials for the user before starting the worker
-            ok, user, credentials, fail_msg, fail_reason = shared._get_credentials(self)
-            if not ok:
-                # User not logged in, or no or invalid credentials
-                logging.info(fn_name + "Get credentials error: " + fail_msg)
-                logservice.flush()
-                shared._redirect_for_auth(self, user)
-                return
-            
-            user_email = user.email()
-            
-            # ==========================================================
-            #       Create a Taskqueue entry to start the import
-            # ==========================================================
-            process_tasks_job.job_start_timestamp = datetime.datetime.now()
-            process_tasks_job.put()
-            
-            # Add the request to the tasks queue, passing in the user's email so that the task can access the database record
-            q = taskqueue.Queue(settings.PROCESS_TASKS_REQUEST_QUEUE_NAME)
-            t = taskqueue.Task(url=settings.WORKER_URL, params={settings.TASKS_QUEUE_KEY_NAME : user_email}, method='POST')
-            logging.debug(fn_name + "Adding task to " + str(settings.PROCESS_TASKS_REQUEST_QUEUE_NAME) + 
-                " queue, for " + str(user_email))
-            logservice.flush()
-            
-            try:
-                q.add(t)
-            except Exception, e:
-                logging.exception(fn_name + "Exception adding task to taskqueue")
-                logservice.flush()
-                
-                process_tasks_job.status = constants.JobStatus.ERROR
-                process_tasks_job.message = ''
-                process_tasks_job.error_message = "Error starting import process: " + shared.get_exception_msg(e)
-                process_tasks_job.job_progress_timestamp = datetime.datetime.now()
-                logging.debug(fn_name + "Job status: '" + str(process_tasks_job.status) + ", progress: " + 
-                    str(process_tasks_job.total_progress) + ", msg: '" + 
-                    str(process_tasks_job.message) + "', err msg: '" + str(process_tasks_job.error_message))
-                logservice.flush()
-                process_tasks_job.put()
-                
-                # Import process terminated, so delete the blobstore
-                blob_key = process_tasks_job.blobstore_key
-                blob_info = blobstore.BlobInfo.get(blob_key)
-                shared.delete_blobstore(blob_info)
-                
-                shared._serve_message_page("Error creating tasks import job.",
-                    "Please report the following error using the link below",
-                    shared.get_exception_msg(e))
-                
-                logging.debug(fn_name + "<End> (error adding job to taskqueue)")
-                logservice.flush()
-                return
 
-            logging.debug(fn_name + "Import job created. Redirect to " + settings.PROGRESS_URL + " for " + str(user_email))
-            logservice.flush()
-            
-            # Redirect to Progress page
-            self.redirect(settings.PROGRESS_URL)
-            
-        except shared.DailyLimitExceededError, e:
-            logging.warning(fn_name + e.msg)
-            self.response.out.write(e.msg)
-            logging.debug(fn_name + "<End> (Daily Limit Exceeded)")
-            logservice.flush()
-            
-        except Exception, e:
-            logging.exception(fn_name + "Caught top-level exception")
-            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % shared.get_exception_msg(e))
-            logging.debug(fn_name + "<End> due to exception" )
-            logservice.flush()
-
-        logging.debug(fn_name + "<End>")
-        logservice.flush()
-        
-
-    
 class ShowProgressHandler(webapp.RequestHandler):
     """Handler to display progress to the user """
     
@@ -595,19 +610,12 @@ class ShowProgressHandler(webapp.RequestHandler):
         logservice.flush()
         
         try:
-            # DEBUG
-            # if self.request.cookies.has_key('auth_retry_count'):
-                # logging.debug(fn_name + "Cookie: auth_retry_count = " + str(self.request.cookies['auth_retry_count']))
-            # else:
-                # logging.debug(fn_name + "No auth_retry_count cookie found")
-            # logservice.flush()            
-            
             user = users.get_current_user()
             if not user:
                 # User not logged in
                 logging.info(fn_name + "No user information")
                 logservice.flush()
-                shared._redirect_for_auth(self, user)
+                shared.redirect_for_auth(self, user)
                 return
                 
             client_id, client_secret, user_agent, app_title, product_name, host_msg = shared.get_settings(self.request.host)
@@ -642,20 +650,25 @@ class ShowProgressHandler(webapp.RequestHandler):
                 import_tasklist_suffix = process_tasks_job.import_tasklist_suffix
                 job_msg = process_tasks_job.message
                 import_method = process_tasks_job.import_method
+                is_paused = process_tasks_job.is_paused
+                pause_reason = process_tasks_job.pause_reason
                 
-                if not status in constants.JobStatus.STOPPED_VALUES:
-                    # Check if the job has stalled (no progress timestamp updates)
-                    time_since_last_update = datetime.datetime.now() - process_tasks_job.job_progress_timestamp
-                    if time_since_last_update.seconds > settings.MAX_JOB_PROGRESS_INTERVAL:
-                        logging.error(fn_name + "Last job progress update was " + str(time_since_last_update.seconds) +
-                            " seconds ago. Job appears to have stalled. Job was started " + str(job_execution_time.seconds) + 
-                            " seconds ago at " + str(job_start_timestamp) + " UTC")
-                        error_message = "Job appears to have stalled. Status was " + process_tasks_job.status
-                        if process_tasks_job.error_message:
-                            error_message = error_message + ", previous error was " + process_tasks_job.error_message
-                        status = 'job_stalled'
+                if is_paused:
+                    logging.error(fn_name + "Job is paused: " + pause_reason)
+                else:
+                    if not status in constants.ImportJobStatus.STOPPED_VALUES:
+                        # Check if the job has stalled (no progress timestamp updates)
+                        time_since_last_update = datetime.datetime.now() - process_tasks_job.job_progress_timestamp
+                        if time_since_last_update.seconds > settings.MAX_JOB_PROGRESS_INTERVAL:
+                            logging.error(fn_name + "Last job progress update was " + str(time_since_last_update.seconds) +
+                                " seconds ago. Job appears to have stalled. Job was started " + str(job_execution_time.seconds) + 
+                                " seconds ago at " + str(job_start_timestamp) + " UTC")
+                            error_message = "Job appears to have stalled. Status was " + process_tasks_job.status
+                            if process_tasks_job.error_message:
+                                error_message = error_message + ", previous error was " + process_tasks_job.error_message
+                            status = 'job_stalled'
             
-            if status == constants.JobStatus.IMPORT_COMPLETED:
+            if status == constants.ImportJobStatus.IMPORT_COMPLETED:
                 logging.info(fn_name + "Imported " + str(progress) + " tasks for " + str(user_email))
             else:
                 logging.debug(fn_name + "Status = " + str(status) + ", progress = " + str(progress) + 
@@ -666,13 +679,13 @@ class ShowProgressHandler(webapp.RequestHandler):
             
             path = os.path.join(os.path.dirname(__file__), constants.PATH_TO_TEMPLATES, "progress.html")
             
-            #refresh_url = self.request.host + '/' + settings.PROGRESS_URL
-            
             template_values = {'app_title' : app_title,
                                'host_msg' : host_msg,
-                               'url_home_page' : settings.MAIN_PAGE_URL,
+                               'url_home_page' : settings.WELCOME_PAGE_URL,
                                'product_name' : product_name,
                                'status' : status,
+                               'is_paused' : is_paused,
+                               'pause_reason' : pause_reason,
                                'progress' : progress,
                                'total_num_rows_to_process' : total_num_rows_to_process,
                                'import_method' : import_method,
@@ -684,9 +697,15 @@ class ShowProgressHandler(webapp.RequestHandler):
                                'user_email' : user_email,
                                'display_technical_options' : shared.isTestUser(user_email),
                                'url_main_page' : settings.MAIN_PAGE_URL,
-                               #'refresh_url' : settings.PROGRESS_URL,
                                'msg': self.request.get('msg'),
                                'logout_url': users.create_logout_url(settings.WELCOME_PAGE_URL),
+                               'STARTING' : constants.ImportJobStatus.STARTING,
+                               'INITIALISING' : constants.ImportJobStatus.INITIALISING,
+                               'IMPORTING' : constants.ImportJobStatus.IMPORTING,
+                               'IMPORT_COMPLETED' : constants.ImportJobStatus.IMPORT_COMPLETED,
+                               'DAILY_LIMIT_EXCEEDED' : constants.PauseReason.DAILY_LIMIT_EXCEEDED,
+                               'USER_INTERRUPTED' : constants.PauseReason.USER_INTERRUPTED,
+                               'ERROR' : constants.ImportJobStatus.ERROR,
                                'url_discussion_group' : settings.url_discussion_group,
                                'email_discussion_group' : settings.email_discussion_group,
                                'url_issues_page' : settings.url_issues_page,
@@ -694,8 +713,6 @@ class ShowProgressHandler(webapp.RequestHandler):
                                'app_version' : appversion.version,
                                'upload_timestamp' : appversion.upload_timestamp}
             self.response.out.write(template.render(path, template_values))
-            # logging.debug(fn_name + "Calling garbage collection")
-            # gc.collect()
             logging.debug(fn_name + "<End>")
             logservice.flush()
         except Exception, e:
@@ -735,6 +752,7 @@ class InvalidCredentialsHandler(webapp.RequestHandler):
                                  'rc' : self.request.get('rc'),
                                  'nr' : self.request.get('nr'),
                                  'err' : self.request.get('err'),
+                                 'AUTH_RETRY_COUNT_COOKIE_EXPIRATION_TIME' : settings.AUTH_RETRY_COUNT_COOKIE_EXPIRATION_TIME,
                                  'host_msg' : host_msg,
                                  'url_main_page' : settings.MAIN_PAGE_URL,
                                  'url_home_page' : settings.WELCOME_PAGE_URL,
@@ -917,19 +935,24 @@ class AuthHandler(webapp.RequestHandler):
         
         try:
                 
-            ok, user, credentials, fail_msg, fail_reason = shared._get_credentials(self)
+            ok, user, credentials, fail_msg, fail_reason = shared.get_credentials(self)
             if ok:
                 logging.debug(fn_name + "User is authorised. Redirecting to " + settings.MAIN_PAGE_URL)
                 self.redirect(settings.MAIN_PAGE_URL)
             else:
-                shared._redirect_for_auth(self, user)
+                shared.redirect_for_auth(self, user)
             
             logging.debug(fn_name + "<End>" )
             logservice.flush()
             
         except shared.DailyLimitExceededError, e:
             logging.warning(fn_name + e.msg)
-            self.response.out.write(e.msg)
+            # self.response.out.write(e.msg)
+            msg1 = "Daily limit exceeded"
+            msg2 = "This application is running on my personal AppSpot account, which is limited by Google to a total of 5000 task updates per day."
+            msg3 = "The daily quota is reset at midnight Pacific Standard Time (5:00pm Australian Eastern Standard Time, 07:00 UTC). " + \
+                "Please rerun any time after midnight PST to finish your import."
+            shared.serve_message_page(msg1, msg2, msg3)
             logging.debug(fn_name + "<End> (Daily Limit Exceeded)")
             logservice.flush()
             
@@ -1007,7 +1030,7 @@ class OAuthCallbackHandler(webapp.RequestHandler):
                     logging.debug(fn_name + "<End> (Error retrieving credentials)")
                     logservice.flush()
                 else:
-                    # Redirect to the URL stored in the "state" param, when shared._redirect_for_auth was called
+                    # Redirect to the URL stored in the "state" param, when shared.redirect_for_auth was called
                     # This should be the URL that the user was on when authorisation failed
                     logging.debug(fn_name + "Success. Redirecting to " + str(self.request.get("state")))
                     self.redirect(self.request.get("state"))
@@ -1037,6 +1060,7 @@ def real_main():
             (settings.ADMIN_MANAGE_BLOBSTORE_URL,       ManageBlobstoresHandler),
             (settings.ADMIN_DELETE_BLOBSTORE_URL,       DeleteBlobstoreHandler),
             (settings.ADMIN_BULK_DELETE_BLOBSTORE_URL,  BulkDeleteBlobstoreHandler),
+            (settings.CONTINUE_IMPORT_JOB_URL,          ContinueImportJob),
             ("/auth",                                   AuthHandler),
             # '/oauth2callback' is specified "API Access" on the page at https://code.google.com/apis/console/
             ("/oauth2callback",                         OAuthCallbackHandler), 

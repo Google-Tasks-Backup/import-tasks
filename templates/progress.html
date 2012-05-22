@@ -1,12 +1,17 @@
 {% comment %}
 
 This is the Django template used by test-taskqueue.py
+
+status constants: STARTING, INITIALISING, IMPORTING, IMPORT_COMPLETED, ERROR
+
 {% endcomment %}
 <!doctype html>
 <html>
     <head>
-        {% if status == "Starting" or status = "Initialising" or status == "Building"  or status == "Importing" %}
-            <meta http-equiv="refresh" content="{{ refresh_interval }}">
+        {% if status == STARTING or status = INITIALISING or status == IMPORTING %}
+            {% if not is_paused %}
+                <meta http-equiv="refresh" content="{{ refresh_interval }}">
+            {% endif %}
         {% endif %}
         
         <title>{{ app_title }}</title>
@@ -135,55 +140,88 @@ This is the Django template used by test-taskqueue.py
             No import job found for {{ user_email }}
             <br />
             Please click button to start an import
-        <form method="GET" action="{{ url_main_page }}">
-            <button type="submit">Start import</button>
-        </form>
+            <form method="GET" action="{{ url_main_page }}">
+                <button type="submit">Start import</button>
+            </form>
         </div>
     {% endif %}
     
     
-    {% if status == "Starting" or status = "Initialising" or status == "Importing" %}
-        <div class="break">
-            This page will auto-refresh every {{ refresh_interval }} seconds to indicate progress.
-		</div>
-    {% endif %}
-    
-    {% if status == "Import completed" %}
-        <div class="import-completed-message">
-            <div class="take-note-larger">
-                Import completed.
+    {% if is_paused %}
+        <br />
+        {% if pause_reason == DAILY_LIMIT_EXCEEDED %}
+            <h3>Daily limit exceeded</h3>
+            <div class="break">
+                This application is running on my personal AppSpot account, which is limited by Google to a total of 5000 task updates per day.
             </div>
             <div class="break">
-                Import method: {{ import_method }}
-                {% if import_tasklist_suffix %}
-                    <div class="comment break">
-                        Appended "{{ import_tasklist_suffix }}" to imported tasklist names.
+                The daily quota is reset at midnight Pacific Standard Time (5:00pm Australian Eastern Standard Time, 07:00 UTC).
+            </div>
+            <div class="take-note break">
+                Your import job has been saved. Please rerun <a href="{{ url_home_page }}">{{ app_title }}</a> any time after midnight PST to finish your import.
+            </div>
+            {% if job_msg %}
+                <br />
+                <div class="break">
+                    {{ job_msg }}
+                </div>
+            {% endif %}
+        {% else %}
+            <h3>{{ pause_reason }}</h3>
+            {% if job_msg %}
+                <br />
+                <div class="break">
+                    {{ job_msg }}
+                </div>
+            {% endif %}
+        {% endif %}
+    {% else %}
+    
+        {% if status == STARTING or status = INITIALISING or status == IMPORTING %}
+            <div class="break">
+                This page will auto-refresh every {{ refresh_interval }} seconds to indicate progress.
+            </div>
+        {% endif %}
+        {% if status == IMPORT_COMPLETED %}
+            <div class="import-completed-message">
+                <div class="take-note-larger">
+                    Import completed.
+                </div>
+                <div class="break">
+                    Import method: {{ import_method }}
+                    {% if import_tasklist_suffix %}
+                        <div class="comment break">
+                            Appended "{{ import_tasklist_suffix }}" to imported tasklist names.
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="medium-break">
+                    {{ job_msg }} 
+                </div>
+            </div>
+            
+            <form action="{{ url_main_page }}" method="get">
+                <button type="submit" class="big-button" value="Return to main page">Return to main page</button>
+            </form>
+        {% else %}
+            <div class="break">
+                Status = {{ status }}
+            </div>
+            {% comment %}
+                {% if progress > 0 %}
+                    <div class="break">
+                        Progress = {{ progress }} of {{ total_num_rows_to_process }}
                     </div>
                 {% endif %}
-            </div>
-            <div class="medium-break">
-                {{ job_msg }} 
-            </div>
-        </div>
-        
-        <form action="{{ url_main_page }}" method="get">
-            <button type="submit" class="big-button" value="Return to main page">Return to main page</button>
-        </form>
-    {% else %}
-        <div class="break">
-            Status = {{ status }}
-        </div>
-        {% if progress > 0 %}
-            <div class="break">
-                Progress = {{ progress }} of {{ total_num_rows_to_process }}
-            </div>
-        {% endif %}
-        {% if job_msg %}
-            <div class="break">
-                {{ job_msg }}
-            </div>
+            {% endcomment %}
+            {% if job_msg %}
+                <div class="break">
+                    {{ job_msg }}
+                </div>
+            {% endif %}
         {% endif %}
     {% endif %}
+    
     
         
     {% if error_message %}
@@ -202,254 +240,6 @@ This is the Django template used by test-taskqueue.py
         <br />
     {% endif %}
     
-    {% if status == "Export completed" %}
-        <!-- Choose format to return backup data -->
-        <form method="POST" action="{{ results_url }}" >
-        
-			<fieldset>
-				<legend>Export all tasks</legend>
-				<table  cellspacing="0" class="format-selection">
-					<!--<col width="20%">
-					<col width="80%">-->
-					<tr>
-						<td class="format-name">
-							<input type="radio" name="format" value="import_export" checked="checked" /> Import/Export CSV<br />
-						</td>
-						<td>
-							CSV formatted for importing back into {{ app_title }} (e.g. as a backup, or when transferring tasks to another Google account).
-						</td>
-					</tr>
-					<tr>
-						<td class="format-name">
-							<input type="radio" name="format" value="outlook" /> Outlook CSV<br />
-						</td>
-						<td>
-							CSV file suitable for importing into Outlook.
-						</td>
-					</tr>
-					<tr>
-						<td class="format-name">
-							<input type="radio" name="format" value="ics" /> iCal ICS<br />
-						</td>
-						<td>
-							iCal .ICS file suitable for importing into many calendar applications.
-						</td>
-					</tr>
-					<tr>
-						<td class="format-name">
-							<input type="radio" name="format" value="raw" /> Raw CSV<br />
-						</td>
-						<td>
-							CSV file containing almost all available properties for each task.
-                            <br />
-                            See the <a href="/static/info.html">information page</a> for details.
-						</td>
-					</tr>
-					<tr>
-						<td class="format-name">
-							<input type="radio" name="format" value="raw1" /> Raw CSV, formatted dates<br />
-						</td>
-						<td>
-							Same as Raw CSV, but with date/timestamps formatted suitable for reading by Excel.
-						</td>
-					</tr>
-                    <tr>
-                        <td class="format-name">
-                            <input type="radio" name="format" value="py" /> Python<br />
-                        </td>
-                        <td>
-                            Python data structure. Contains all the properties stored by Google for each task. See the <a href="/static/info.html">information page</a> for details.
-                        </td>
-                    </tr>
-					<tr>
-						<td class="format-name">
-							<input type="radio" name="format" value="RTM" /> RTM email<br />
-						</td>
-						<td>
-							Email tasks in Remember The Milk format.
-                            <img class="popupTrigger" id="help-rtm" src="/static/help.png" alt="Display help">
-                            <div class="popupContent" id="help-rtm-content">
-                                <img class="popupClose" src="/static/close.png" alt="Close">
-                                <ol class="clear">
-                                    <li>
-                                        Attempting to email large tasklists will fail due to App Engine quota limits.
-                                    </li>
-                                    <li>
-                                        It appears that RTM will not import more than 50 tasks.
-                                    </li>
-                                    <li>
-                                        Any header text must be removed before forwarding the received email to your RTM import email address. The first line in the email must be a task.
-                                    </li>
-                                </ol>
-                            </div>
-						</td>
-					</tr>
-					</table>
-					<br />
-
-				<button type="submit" id="retrieve-tasks-button" class="big-button" value="Retrieve tasks data">Retrieve tasks data</button>
-			</fieldset>
-        </form>
-        
-        <div class="break">
-        </div>
-        
-
-        <form method="POST" action="{{ results_url }}" onsubmit="disableDisplayHtmlButton();" >
-        
-            <input type="hidden" name="format" value="html_raw" />
-            <input type="hidden" name="job_start_timestamp" value="{{ job_start_timestamp }}" />
-            
-            <!-- These values are set by setDateFields(), which is originally called by setCurrentDueDate() on page load.
-                 setDateFields() is also called when the user clicks on a date the date picker form.
-            -->
-            <input type="hidden" id="due_year" name="due_year" value="0001" />
-            <input type="hidden" id="due_month" name="due_month" value="1" />
-            <input type="hidden" id="due_day" name="due_day" value="1" />
-            
-            
-			<fieldset>
-				<legend>
-                    Display all tasks as a single web page, suitable for printing
-                    <img class="popupTrigger" id="help-display" src="/static/help.png" alt="Display help">
-                </legend>
-                <div class="popupContent" id="help-display-content">
-                    <img class="popupClose" src="/static/close.png" alt="Close">
-                    <div class="clear medium-break">
-                        The resultant web page will contain all the tasks in all the task lists. There is no pretty formatting, so a page break may occur in the middle of a task.
-                    </div>
-                    <div class="medium-break">
-                        Note that the resultant printout can be MANY pages (especially when tasks have notes). 973 tasks in 7 tasklists resulted in 141 pages.
-                    </div>
-                </div>
-                <div class="format-selection">
-                    <div class="left-column">
-                        <div class="selection-column-header">
-                            Filter by due date <span id="due_date" class="due_date" onclick="javascript:NewCal('due_date')" >0001-01-01</span>&nbsp;<button type="button" onclick="javascript:NewCal('due_date')" >Choose date <img src="/static/cal.gif" width="16" height="16" border="0" alt="Set due date filter"></button>&nbsp;or&nbsp;<button type="button" onclick="setCurrentDueDate()" >Use today</button>
-	  		
-                            </div>
-                        <noscript>
-                            <br />
-                            <span class="take-note">Javascript must be enabled to determine current date, and to enable date to be set</span>
-                            </noscript>
-                        </input>
-                        <ul class="format-selection">
-                            <li>
-                                <input id="due_selection_all" type="radio" name="due_selection" value="all" 
-                                       onchange="changeCompletedOptions();" checked="yes" />
-                                <label for="due_selection_all">All tasks</label>
-                            </li>
-                            <li>
-                                <input id="due_selection_any_due" type="radio" name="due_selection" value="any_due"
-                                       onchange="changeCompletedOptions();" />
-                                <label for="due_selection_all">Any tasks with a due date (incl future due)</label>
-                            </li>
-                            <li>
-                                <input id="due_selection_due_now" type="radio" name="due_selection" value="due_now"
-                                       onchange="changeCompletedOptions();" />
-                                <label for="due_selection_all">Tasks due on or before selected date</label>
-                            </li>
-                            <li>
-                                <input id="due_selection_overdue" type="radio" name="due_selection" value="overdue" 
-                                       onchange="changeCompletedOptions();" />
-                                <label for="due_selection_all">Overdue only (due before selected data)</label>
-                            </li>
-                        </ul>
-                        <div class="selection-column-header">Other task filters</div>
-                        <ul class="format-selection">
-                            <li>
-                                <input type="checkbox" name="display_invalid_tasks" value="True" >
-                                    &nbsp;Display invalid/corrupted tasks? 
-                                    <img class="popupTrigger" id="help-invalid" src="/static/help.png" alt="Display help">
-                                    <div class="popupContent" id="help-invalid-content">
-                                        <img class="popupClose" src="/static/close.png" alt="Close">
-                                        <div class="clear medium-break">
-                                            If checked, the application tries to identify and label potentially invalid tasks.
-                                        </div>
-                                        <div class="clear medium-break">
-                                            Sometimes, tasks can become corrupted, leaving an invalid parent value. These tasks still exist in the Google Tasks database, although Google does not display them.
-                                        </div>
-                                        <div class="medium-break">
-                                            Refer to <a href="/static/info.html#notes">note 4 on the information page</a> for more details.
-                                        </div>
-                                    </div>
-                                </input>
-                            </li>
-                        </ul>
-                    </div>
-                    
-                    <div class="right-column">
-                        <div class="selection-column-header">Display options</div>
-                        <ul class="format-selection">
-                            {% if include_completed %}
-                            <li>
-                                <input type="checkbox" id="display_completed_tasks" name="display_completed_tasks" value="True" 
-                                       checked="checked"  onchange="changeCompletedSuboptions();">
-                                    &nbsp;Display completed tasks?
-                                </input>
-                            </li>
-                            <li>
-                                <ul class="format-selection sub-list">
-                                <li>
-                                    <input type="checkbox" id="dim_completed_tasks" name="dim_completed_tasks" value="True" 
-                                           onchange="changeDisplayCompleted();" checked="checked" >
-                                        &nbsp;Dim completed tasks?
-                                    <img class="popupTrigger" id="help-display-completed" src="/static/help.png" alt="Display help">
-                                    <div class="popupContent" id="help-display-completed-content">
-                                        <img class="popupClose" width="24" height="24" src="/static/close.png" alt="Close">
-                                        <div class="clear">
-                                            <div class="small-break">
-                                                If checked, completed tasks are displayed using a dimmed grey font. 
-                                            </div>
-                                            <div class="small-break">
-                                                If unchecked, completed tasks are displayed normally.
-                                            </div>
-                                            <div class="small-break">
-                                                Hidden and deleted tasks are always dimmed.
-                                            </div>
-                                        </div>
-                                    </div>
-                                    </input>
-                                </li>
-                                <li>
-                                    <input type="checkbox" id="display_completed_date_field" name="display_completed_date_field" value="True"  
-                                           onchange="changeDisplayCompleted();" checked="checked" >
-                                        &nbsp;Display completed date field?
-                                    </input>
-                                </li>
-                                </ul>
-                            </li>
-                            {% endif %}
-                            <li>
-                                <input type="checkbox" name="display_due_date_field" value="True" checked="checked" >
-                                    &nbsp;Display due date field?
-                                </input>
-                            </li>
-                            <li>
-                                <input type="checkbox" name="display_updated_date_field" value="True" >
-                                    &nbsp;Display updated date field?
-                                </input>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-				<br />
-                
-                    <div class="take-note-para end-columns">
-                    {% if progress >= large_list_html_warning_limit %}
-                        <span class="take-note">CAUTION: You have a very large number of tasks. Attempting to display the tasks page may result in the server running out of memory and/or your browser timing out.
-                        </span>
-                        <br />
-                        You may wish to export your tasks first, before attempting to display the tasks page.
-                    {% endif %}
-                    </div>
-				<button id="display-tasks-button" type="submit" class="big-button" >Display tasks page</button>
-			</fieldset>
-        </form>
-        <div class="break">
-        </div>
-
-    {% endif %}
 
 
 	<div class="project-footer">

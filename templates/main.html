@@ -26,6 +26,20 @@ This is the Django template for the landing page.
         <script type="text/javascript" src="/static/jquery.js"></script>
         <script type="text/javascript" src="/static/popup.js"></script>
         <script type="text/javascript">
+        
+            function displayPausedOptions(t) {
+                if (t) {
+                    $('#import_new').fadeOut("fast");
+                    $('#import_existing').fadeIn("fast");
+                    //document.getElementById('import_new').style.display = 'none';
+                    //document.getElementById('import_existing').style.display = '';
+                } else {
+                    $('#import_existing').fadeOut("fast");
+                    $('#import_new').fadeIn("fast");
+                    //document.getElementById('import_new').style.display = '';
+                    //document.getElementById('import_existing').style.display = 'none';
+                }
+            }
 
             function disableButton() {
                 document.getElementById("start_backup").value = "Starting backup (this may take several minutes) ...";
@@ -85,7 +99,8 @@ This is the Django template for the landing page.
         </script>
     </head>
 
-<body>
+{# "{% if found_paused_job %}true" is used, because found_paused_job returns True, which JavaScript doesn't accept due to uppercase T #}
+<body onload="displayPausedOptions( {% if found_paused_job %}true{% else %}false{% endif %} )">
 
 {% if is_authorized %}
     <div class="usertitle">
@@ -111,7 +126,42 @@ This is the Django template for the landing page.
         <h3>{{ host_msg }}</h3>
         </div>
     {% endif %}
+    
+    {% if found_paused_job %}
+        <br />
+        <div class="take-note-larger" >
+            <br />
+            An existing import job has been found. Do you wish to continue importing tasks from that data?
+            <form>
+                <table  cellspacing="0" class="format-selection" >
+                    <tr>
+                        <td class="format-name">
+                            <input 
+                                type="radio" 
+                                onclick="displayPausedOptions(true);" 
+                                name="continue_pevious_job" 
+                                value="True" 
+                                class="radio-button-left" 
+                                checked="checked">Continue importing from previously uploaded data file
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="format-name">
+                            <input
+                                type="radio" 
+                                onclick="displayPausedOptions(false);" 
+                                name="continue_pevious_job" 
+                                value="False" 
+                                class="radio-button-left">Upload new data file
+                        </td>
+                    </tr>
+                </table>
+            </form>
+            <br />
+        </div>
+    {% endif %}
 
+    <div {% if found_paused_job %}class="no-display"{% endif %} id="import_new">
         <form 
             id="selectFileForm" 
             action="/dummy" 
@@ -121,8 +171,8 @@ This is the Django template for the landing page.
             <!-- Timestamp is used as tasklist name suffix when creating new import taskslist -->
             <input type="hidden" id="import_timestamp_suffix" name="import_timestamp_suffix" value="0001-01-01 00:00:00" />
             
-			<fieldset>
-				<legend>
+            <fieldset>
+                <legend>
                     Import tasks from CSV file
                     <img class="popupTrigger" id="help-import" src="/static/help.png" alt="Display help">
                 </legend>
@@ -141,7 +191,7 @@ This is the Django template for the landing page.
                 </div>
                 
                 
-                <table  cellspacing="0" class="format-selection">
+                <table  cellspacing="0" class="format-selection" id="import_method_table">
                     <tr>
                         <td class="format-name">
                             <input type="radio" name="import_method" value="{{ APPEND_TIMESTAMP }}" class="radio-button-left" checked="checked">
@@ -151,12 +201,12 @@ This is the Django template for the landing page.
                             Append datetime to imported tasklist names</input> i.e., <span class="fixed-font smaller-font">"My Tasklist"</span> becomes <span class="fixed-font smaller-font">"My Tasklist 2012-01-31 19:37:04"</span>
                         </td>
                     </tr>
-					<tr>
-						<td class="format-name">
+                    <tr>
+                        <td class="format-name">
                             <input type="radio" name="import_method" value="{{ USE_OWN_SUFFIX }}" id="use_own_suffix" class="radio-button-left" >
                             {{ USE_OWN_SUFFIX }}
-						</td>
-						<td>
+                        </td>
+                        <td>
                             Append your own suffix <input id="user_suffix" name="user_suffix" type="text" onfocus="javascript:document.getElementById('use_own_suffix').checked=true;" />
                             <img class="popupTrigger" id="help-USE_OWN_SUFFIX" src="/static/help.png" alt="Display help">
                             <div class="popupContent" id="help-USE_OWN_SUFFIX-content">
@@ -179,14 +229,14 @@ This is the Django template for the landing page.
                                     that were in the "Shopping" tasklist. Existing tasklists will not be altered.
                                 </div>
                             </div>
-						</td>
-					</tr>
-					<tr>
-						<td class="format-name">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="format-name">
                             <input type="radio" name="import_method" value="{{ ADD_TO_EXISTING_TASKLIST }}" class="radio-button-left" >
                             {{ ADD_TO_EXISTING_TASKLIST }}
-						</td>
-						<td>
+                        </td>
+                        <td>
                             Add imported tasks to existing tasklist. 
                             <img class="popupTrigger" id="help-ADD_TO_EXISTING_TASKLIST" src="/static/help.png" alt="Display help">
                             <div class="popupContent" id="help-ADD_TO_EXISTING_TASKLIST-content">
@@ -215,14 +265,14 @@ This is the Django template for the landing page.
                                     </ol>
                                 </div>
                             </div>
-						</td>
-					</tr>
-					<tr>
-						<td class="format-name">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="format-name">
                             <input type="radio" name="import_method" value="{{ REPLACE_TASKLIST_CONTENT }}" class="radio-button-left" />
                             {{ REPLACE_TASKLIST_CONTENT }}
-						</td>
-						<td>
+                        </td>
+                        <td>
                             Replace tasklist content with imported tasks. 
                             <img class="popupTrigger" id="help-REPLACE_TASKLIST_CONTENT" src="/static/help.png" alt="Display help">
                             <div class="popupContent" id="help-REPLACE_TASKLIST_CONTENT-content">
@@ -243,14 +293,14 @@ This is the Django template for the landing page.
                                     </ul>
                                 </div>
                             </div>
-						</td>
-					</tr>
-					<tr>
-						<td class="format-name">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="format-name">
                             <input type="radio" name="import_method" value="{{ SKIP_DUPLICATE_TASKLIST }}" class="radio-button-left" />
                             {{ SKIP_DUPLICATE_TASKLIST }}
-						</td>
-						<td>
+                        </td>
+                        <td>
                             If tasklist with the same name exists, do not import tasks from that tasklist. 
                             <img class="popupTrigger" id="help-SKIP_DUPLICATE_TASKLIST" src="/static/help.png" alt="Display help">
                             <div class="popupContent" id="help-SKIP_DUPLICATE_TASKLIST-content">
@@ -271,14 +321,14 @@ This is the Django template for the landing page.
                                     </ul>
                                 </div>
                             </div>
-						</td>
-					</tr>
-					<tr>
-						<td class="format-name">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="format-name">
                             <input type="radio" name="import_method" value="{{ DELETE_BEFORE_IMPORT }}" class="radio-button-left" />
                             {{ DELETE_BEFORE_IMPORT }}
-						</td>
-						<td>
+                        </td>
+                        <td>
                             Delete ALL existing tasklists before importing.
                             <img class="popupTrigger" id="help-DELETE_BEFORE_IMPORT" src="/static/help.png" alt="Display help">
                             <img class="popupTrigger" id="help-DELETE_BEFORE_IMPORT" src="/static/warning.png" alt="Display warning">
@@ -304,13 +354,13 @@ This is the Django template for the landing page.
                                     </li>
                                 </ul>
                             </div>
-						</td>
-					</tr>
+                        </td>
+                    </tr>
                 
                 </table>
                 
                 <div class="select-import-file">
-                    <span class="take-note-larger">Select CSV file to upload:</span>
+                    <span class="take-note-16">Select CSV file to upload:</span>
                     <img class="popupTrigger" id="help-import" src="/static/warning.png" alt="Display warning">
                     <input type="file" size="100" id="select_file" name="file" onchange="uploadFile();">
                     <div class="nice-gap-top" id="actionMsg">The file must be in the format produced by the {{ app_title }} "Import/Export CSV" format
@@ -326,7 +376,22 @@ This is the Django template for the landing page.
                 </div>
             </fieldset>
         </form>
-                    <br />
+    </div>
+    <div class="no-display" id="import_existing">
+        <form action="/continue" method="GET">
+            <input class="back-button" type="submit" value="Continue importing tasks from previously uploaded file">
+            <div class="continue-job-details">
+                {% if total_progress > 0 %}
+                    <div class="small-break">
+                        Previously imported {{ total_progress }} tasks from total {{ total_num_rows_to_process }} data rows.
+                    </div>
+                {% endif %}
+                <div class="medium-break">File name: {{ file_name }}</div>
+                <div class="small-break">Uploaded: {{ file_upload_time }} UTC</div>
+            </div>
+        </form>
+    </div>
+    <br />
 
 	<div class="project-footer">
         <div class="break">

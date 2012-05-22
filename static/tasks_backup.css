@@ -86,6 +86,10 @@ label.choose_display_format {
   display: block;
 } 
 
+.no-display {
+    display: none;
+}
+
 .instructions {
     margin-left: 45px;
     margin-right: 45px;
@@ -165,14 +169,9 @@ legend
     font-size: larger;
 }
 
-.nice-gap-top {
-    margin-top:6px;
-}
-
-.import-completed-message {
-    margin-top:60px;
-    margin-left:30px;
-    margin-bottom:20px;
+.take-note-16 {
+    font-weight: bold;
+    font-size: 16pt;
 }
 
 .take-note-smaller {
@@ -186,6 +185,25 @@ legend
     margin-bottom: 10px;
     /* margin-top: 10px; */
     margin-right: 35px;
+}
+
+.continue-job-details {
+    margin-top: 10px;
+    margin-left: 30px;
+    font-size: larger;
+    font-weight: bold;
+    margin-bottom: 10px;
+    margin-right: 10px;
+}
+
+.nice-gap-top {
+    margin-top:6px;
+}
+
+.import-completed-message {
+    margin-top:60px;
+    margin-left:30px;
+    margin-bottom:20px;
 }
 
 .heading {
@@ -409,6 +427,12 @@ td.not-valid {
 .back-button {
     margin-top:15px;
     font-size: larger;
+    font-weight: bold;
+    padding: 8px 16px 8px 16px;
+}
+
+.continue-button {
+    font-size: 14pt;
     font-weight: bold;
     padding: 8px 16px 8px 16px;
 }
