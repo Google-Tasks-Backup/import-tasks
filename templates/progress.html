@@ -181,6 +181,10 @@ status constants: STARTING, INITIALISING, IMPORTING, IMPORT_COMPLETED, ERROR
             <div class="break">
                 This page will auto-refresh every {{ refresh_interval }} seconds to indicate progress.
             </div>
+            <div class="break">
+                The import will continue in the background even if this window is closed. 
+                The import status can be checked at any time by returning to this page.
+            </div>
         {% endif %}
         {% if status == IMPORT_COMPLETED %}
             <div class="import-completed-message">

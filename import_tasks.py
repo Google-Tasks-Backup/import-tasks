@@ -697,6 +697,7 @@ class ShowProgressHandler(webapp.RequestHandler):
                                'user_email' : user_email,
                                'display_technical_options' : shared.isTestUser(user_email),
                                'url_main_page' : settings.MAIN_PAGE_URL,
+                               'PROGRESS_URL' : settings.PROGRESS_URL,
                                'msg': self.request.get('msg'),
                                'logout_url': users.create_logout_url(settings.WELCOME_PAGE_URL),
                                'STARTING' : constants.ImportJobStatus.STARTING,
