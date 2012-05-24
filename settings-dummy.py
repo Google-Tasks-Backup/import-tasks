@@ -5,27 +5,27 @@
 # to allow the application to be run on different hosts, (e.g., test and production),
 # without having to change these values each time.
 
-client_ids = { 'tasks-backup.appspot.com'                  : '123456789012.apps.googleusercontent.com',
-               'tb-test-server.appspot.com'                : '987654321987.apps.googleusercontent.com',
+client_ids = { 'import-tasks.appspot.com'                  : '123456789012.apps.googleusercontent.com',
+               'import-tasks-test.appspot.com'             : '987654321987.apps.googleusercontent.com',
                'localhost:8084'                            : '999999999999.apps.googleusercontent.com'}
                 
-client_secrets = { 'tasks-backup.appspot.com'              : 'MyVerySecretKeyForProdSvr',
-                   'tb-test-server.appspot.com'            : 'MyVerySecretKeyForTestSvr',
+client_secrets = { 'import-tasks.appspot.com'              : 'MyVerySecretKeyForProdSvr',
+                   'import-tasks-test.appspot.com'         : 'MyVerySecretKeyForTestSvr',
                    'localhost:8084'                        : 'MyVerySecretKeyForLocalSvr'}
                 
-user_agents = { 'tasks-backup.appspot.com'                 : 'tasks-backup/1.0',
-                'tb-test-server.appspot.com'               : 'tasks-backup-test/1.0',
-                'localhost:8084'                           : 'tasks-backup-local/1.0'}
+user_agents = { 'import-tasks.appspot.com'                 : 'import-tasks/1.0',
+                'import-tasks-test.appspot.com'            : 'import-tasks-test/1.0',
+                'localhost:8084'                           : 'import-tasks-local/1.0'}
 
 # User agent value used if no entry found for specified host                
-DEFAULT_USER_AGENT = 'tasks-backup/2.0'
+DEFAULT_USER_AGENT = 'import-tasks/2.0'
 
 # This should match the "Application Title:" value set in "Application Settings" in the App Engine
 # administration for the server that the app will be running on. This value is displyed in the app,
 # but the value from the admin screen is "Displayed if users authenticate to use your application."
-app_titles = {'tb-test-server.appspot.com'                 : "Test - Import Google Tasks", 
+app_titles = {'import-tasks-test.appspot.com'              : "Test - Import Google Tasks", 
               'localhost:8084'                             : "Local - Import Google Tasks",
-              'tasks-backup.appspot.com'                   : "Import Google Tasks" }
+              'import-tasks.appspot.com'                   : "Import Google Tasks" }
                 
 # Title used when host name is not found, or not yet known
 DEFAULT_APP_TITLE = "Import Google Tasks"
@@ -40,29 +40,28 @@ DEFAULT_APP_TITLE = "Import Google Tasks"
 # at https://www.google.com/accounts/IssuedAuthSubTokens
 # The product name is set in the API Access page as "Product Name", at
 # https://code.google.com/apis/console and is linked to the client ID
-product_names = { '164364198675.apps.googleusercontent.com'    : "Import Google Tasks", 
-                  '823249731479.apps.googleusercontent.com'    : "JS Tasks",
-                  '425175418944.apps.googleusercontent.com'    : "JS Tasks Test",
-                  '314627146721.apps.googleusercontent.com'    : "GTB Local"}
+product_names = { '123456789012.apps.googleusercontent.com'    : "Import Google Tasks", 
+                  '987654321987.apps.googleusercontent.com'    : "Import Tasks Test",
+                  '999999999999.apps.googleusercontent.com'    : "GTB Local"}
 
 # Product name used if no matching client ID found in product_names 
 DEFAULT_PRODUCT_NAME = "Import Google Tasks"
 
 # Host messages are optional
-host_msgs = { 'tb-test-server.appspot.com'                 : "*** Running on test AppEngine server ***", 
+host_msgs = { 'import-tasks-test.appspot.com'              : "*** Running on test AppEngine server ***", 
               'localhost:8084'                             : "*** Running on local host ***",
-              'tasks-backup.appspot.com'                   : "Beta" }
+              'import-tasks.appspot.com'                   : "Beta" }
 
-url_discussion_group = "groups.google.com/group/tasks-backup"
+url_discussion_group = "groups.google.com/group/import-tasks"
 
-email_discussion_group = "tasks-backup@googlegroups.com"
+email_discussion_group = "import-tasks@googlegroups.com"
 
-url_issues_page = "code.google.com/p/tasks-backup/issues/list"
+url_issues_page = "code.google.com/p/import-tasks/issues/list"
 
-url_source_code = "code.google.com/p/tasks-backup/source/browse/"
+url_source_code = "code.google.com/p/import-tasks/source/browse/"
 
 # Must match name in queue.yaml
-BACKUP_REQUEST_QUEUE_NAME = 'tasks-backup-request'
+BACKUP_REQUEST_QUEUE_NAME = 'import-tasks-request'
 
 TASKS_QUEUE_KEY_NAME = 'user_email'
 
