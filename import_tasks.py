@@ -21,6 +21,9 @@
 # Orig __author__ = "dwightguth@google.com (Dwight Guth)"
 __author__ = "julie.smith.1999@gmail.com (Julie Smith)"
 
+from google.appengine.dist import use_library
+use_library("django", "1.2")
+
 import logging
 import os
 import pickle
@@ -63,7 +66,7 @@ import csv
 import model
 import settings
 import appversion # appversion.version is set before the upload process to keep the version number consistent
-import shared # Code whis is common between classes, or between tasks-backup.py and worker.py
+import shared # Code whis is common between classes, or between import-tasks.py and worker.py
 import constants
 
 
@@ -134,7 +137,7 @@ class WelcomeHandler(webapp.RequestHandler):
             
         except Exception, e:
             logging.exception(fn_name + "Caught top-level exception")
-            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % shared.get_exception_msg(e))
+            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % shared.get_exception_msg(e))
             logging.debug(fn_name + "<End> due to exception" )
             logservice.flush()
     
@@ -152,7 +155,6 @@ class MainHandler(webapp.RequestHandler):
         logservice.flush()
         
         try:
-                
             client_id, client_secret, user_agent, app_title, product_name, host_msg = shared.get_settings(self.request.host)
 
             # Make sure that we can get the user's credentials before we allow them to start an import job
@@ -168,7 +170,7 @@ class MainHandler(webapp.RequestHandler):
             user_email = user.email()
             
             # Retrieve the DB record for this user
-            process_tasks_job = model.ProcessTasksJob.get_by_key_name(user_email)
+            process_tasks_job = model.ImportTasksJob.get_by_key_name(user_email)
             
             file_upload_time = None
             file_name = None
@@ -179,7 +181,7 @@ class MainHandler(webapp.RequestHandler):
             found_paused_job = False
             if process_tasks_job:
                 job_status = process_tasks_job.status
-                logging.debug(fn_name + "Retrieved process tasks job for " + str(user_email) +
+                logging.debug(fn_name + "Retrieved import tasks job for " + str(user_email) +
                     ", status = " + str(job_status))
                 logservice.flush()
                 
@@ -286,7 +288,7 @@ class MainHandler(webapp.RequestHandler):
                         
         except Exception, e:
             logging.exception(fn_name + "Caught top-level exception")
-            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % shared.get_exception_msg(e))
+            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % shared.get_exception_msg(e))
             logging.debug(fn_name + "<End> due to exception" )
             logservice.flush()
     
@@ -308,7 +310,7 @@ class ContinueImportJob(webapp.RequestHandler):
             user = users.get_current_user()
             user_email = user.email()
             # Retrieve the import job record for this user
-            process_tasks_job = model.ProcessTasksJob.get_by_key_name(user_email)
+            process_tasks_job = model.ImportTasksJob.get_by_key_name(user_email)
             
             if process_tasks_job is None:
                 logging.error(fn_name + "No DB record for " + user_email)
@@ -338,7 +340,58 @@ class ContinueImportJob(webapp.RequestHandler):
             
         except Exception, e:
             logging.exception(fn_name + "Caught top-level exception")
-            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % shared.get_exception_msg(e))
+            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % shared.get_exception_msg(e))
+            logging.debug(fn_name + "<End> due to exception" )
+            logservice.flush()
+
+    
+        logging.debug(fn_name + "<End>")
+        logservice.flush()
+        
+
+    def post(self):
+        
+        fn_name = "ContinueImportJob.post(): "
+            
+        logging.debug(fn_name + "<Start>")
+        logservice.flush()
+    
+        # Check that job record exists, and is in correct state to continue
+        try:
+            # Only get the user here. The credentials are retrieved within send_job_to_worker()
+            # Don't need to check if user is logged in, because all pages (except '/') are set as secure in app.yaml
+            user = users.get_current_user()
+            user_email = user.email()
+            # Retrieve the import job record for this user
+            process_tasks_job = model.ImportTasksJob.get_by_key_name(user_email)
+            
+            if process_tasks_job is None:
+                logging.error(fn_name + "No DB record for " + user_email)
+                shared.serve_message_page(self, "No import job found.",
+                    "If you believe this to be an error, please report this at the link below, otherwise",
+                    """<a href="/main">start an import</a>""")
+                logging.warning(fn_name + "<End> No DB record")
+                logservice.flush()
+                return
+            
+            if not process_tasks_job.is_paused:
+                shared.serve_message_page(self, "No paused import job found",
+                    "If you believe this to be an error, please report this at the link below, otherwise",
+                    "<a href=" + settings.MAIN_PAGE_URL + ">Go to main menu</a>")
+                logging.warning(fn_name + "<End> Job is not paused. Status: " + str(process_tasks_job.status))
+                logservice.flush()
+                return
+            
+            # Ensure that credentials are as fresh as possible before starting the worker
+            # The auth handler calls GET on this URL, so the import job is initiated in the GET handler for this URL
+            logging.debug(fn_name + "Refreshing auth")
+            shared.redirect_for_auth(self, user)
+            
+            
+            
+        except Exception, e:
+            logging.exception(fn_name + "Caught top-level exception")
+            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % shared.get_exception_msg(e))
             logging.debug(fn_name + "<End> due to exception" )
             logservice.flush()
 
@@ -371,7 +424,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
             user = users.get_current_user()
             user_email = user.email()
             # Retrieve the import job record for this user
-            process_tasks_job = model.ProcessTasksJob.get_by_key_name(user_email)
+            process_tasks_job = model.ImportTasksJob.get_by_key_name(user_email)
             
             if process_tasks_job is None:
                 logging.error(fn_name + "No DB record for " + user_email)
@@ -398,7 +451,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
             
         except Exception, e:
             logging.exception(fn_name + "Caught top-level exception")
-            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % shared.get_exception_msg(e))
+            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % shared.get_exception_msg(e))
             logging.debug(fn_name + "<End> due to exception" )
             logservice.flush()
 
@@ -563,7 +616,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                 # Create a DB record, using the user's email address as the key
                 # We store the job details here, but we add the credentials just before we add the
                 # job to the taskqueue in send_job_to_worker(), so that the credentials are as fresh as possible.
-                process_tasks_job = model.ProcessTasksJob(key_name=user_email)
+                process_tasks_job = model.ImportTasksJob(key_name=user_email)
                 process_tasks_job.user = user
                 process_tasks_job.total_num_rows_to_process = num_data_rows
                 process_tasks_job.blobstore_key = blob_key
@@ -573,14 +626,24 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                 process_tasks_job.import_method = import_method
                 process_tasks_job.status = constants.ImportJobStatus.STARTING
                 process_tasks_job.put()
+
+                # Forcing updated auth, so that worker has as much time as possible (i.e. one hour)
+                # This is to combat situations where person authorises (e.g. when they start), but then does something
+                # else for just under 1 hour before starting the import. In that case, auth expires during the (max) 10 minutes 
+                # that the worker is running (causing AccessTokenRefreshError: invalid_grant)
+                # After authorisation, this URL will be called again as a GET, so we start the import from the GET handler.
+                logging.debug(fn_name + "Forcing auth, to get the freshest possible authorisation token")
+                shared.redirect_for_auth(self, users.get_current_user())
                 
-                # --------------------------------------------------------
-                #       Add job to taskqueue for worker to process
-                # --------------------------------------------------------
-                # Try to start the import job now.
-                # send_job_to_worker() will attempt to retrieve the user's credentials. If that fails, then
-                # this URL will be called again as a GET, and we retry send_job_to_worker() then
-                shared.send_job_to_worker(self, process_tasks_job)
+                
+                
+                # # --------------------------------------------------------
+                # #       Add job to taskqueue for worker to process
+                # # --------------------------------------------------------
+                # # Try to start the import job now.
+                # # send_job_to_worker() will attempt to retrieve the user's credentials. If that fails, then
+                # # this URL will be called again as a GET, and we retry send_job_to_worker() then
+                # shared.send_job_to_worker(self, process_tasks_job)
     
             else:
                 logging.debug(fn_name + "<End> due to no file uploaded" )
@@ -590,7 +653,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                 
         except Exception, e:
             logging.exception(fn_name + "Caught top-level exception")
-            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % shared.get_exception_msg(e))
+            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % shared.get_exception_msg(e))
             logging.debug(fn_name + "<End> due to exception" )
             logservice.flush()
 
@@ -632,7 +695,7 @@ class ShowProgressHandler(webapp.RequestHandler):
             
             
             # Retrieve the DB record for this user
-            process_tasks_job = model.ProcessTasksJob.get_by_key_name(user_email)
+            process_tasks_job = model.ImportTasksJob.get_by_key_name(user_email)
                 
             if process_tasks_job is None:
                 logging.error(fn_name + "No DB record for " + user_email)
@@ -718,7 +781,7 @@ class ShowProgressHandler(webapp.RequestHandler):
             logservice.flush()
         except Exception, e:
             logging.exception(fn_name + "Caught top-level exception")
-            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % shared.get_exception_msg(e))
+            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % shared.get_exception_msg(e))
             logging.debug(fn_name + "<End> due to exception" )
             logservice.flush()
         
@@ -769,7 +832,7 @@ class InvalidCredentialsHandler(webapp.RequestHandler):
             logservice.flush()
         except Exception, e:
             logging.exception(fn_name + "Caught top-level exception")
-            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % shared.get_exception_msg(e))
+            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % shared.get_exception_msg(e))
             logging.debug(fn_name + "<End> due to exception" )
             logservice.flush()
        
@@ -828,7 +891,7 @@ class BulkDeleteBlobstoreHandler(webapp.RequestHandler):
             
         except Exception, e:
             logging.exception(fn_name + "Caught top-level exception")
-            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % shared.get_exception_msg(e))
+            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % shared.get_exception_msg(e))
             logging.debug(fn_name + "<End> due to exception" )
             logservice.flush()
             return
@@ -893,7 +956,7 @@ class ManageBlobstoresHandler(webapp.RequestHandler):
             
         except Exception, e:
             logging.exception(fn_name + "Caught top-level exception")
-            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % shared.get_exception_msg(e))
+            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % shared.get_exception_msg(e))
             logging.debug(fn_name + "<End> due to exception" )
             logservice.flush()
 
@@ -938,6 +1001,11 @@ class AuthHandler(webapp.RequestHandler):
                 
             ok, user, credentials, fail_msg, fail_reason = shared.get_credentials(self)
             if ok:
+                if shared.isTestUser(user.email()):
+                    logging.debug(fn_name + "Existing credentials for " + str(user.email()) + ", expires " + 
+                        str(credentials.token_expiry ) + " UTC")
+                else:
+                    logging.debug(fn_name + "Existing credentials expire " + str(credentials.token_expiry) + " UTC")
                 logging.debug(fn_name + "User is authorised. Redirecting to " + settings.MAIN_PAGE_URL)
                 self.redirect(settings.MAIN_PAGE_URL)
             else:
@@ -959,7 +1027,7 @@ class AuthHandler(webapp.RequestHandler):
             
         except Exception, e:
             logging.exception(fn_name + "Caught top-level exception")
-            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % shared.get_exception_msg(e))
+            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % shared.get_exception_msg(e))
             logging.debug(fn_name + "<End> due to exception" )
             logservice.flush()
 
@@ -999,6 +1067,13 @@ class OAuthCallbackHandler(webapp.RequestHandler):
                         credentials = flow.step2_exchange(self.request.params)
                         # Success!
                         error = False
+                        
+                        if shared.isTestUser(user.email()):
+                            logging.debug(fn_name + "Retrieved credentials for " + str(user.email()) + ", expires " + 
+                                str(credentials.token_expiry) + " UTC")
+                        else:    
+                            logging.debug(fn_name + "Retrieved credentials, expires " + str(credentials.token_expiry) + " UTC")
+                        
                         break
                         
                     except client.FlowExchangeError, e:
@@ -1013,7 +1088,7 @@ class OAuthCallbackHandler(webapp.RequestHandler):
                         
                     if retry_count > 0:
                         logging.info(fn_name + "Error retrieving credentials. " + 
-                                str(retry_count) + " retries remaining: " + shared.get_exception_message(e))
+                                str(retry_count) + " retries remaining: " + shared.get_exception_msg(e))
                         logservice.flush()
                     else:
                         logging.exception(fn_name + "Unable to retrieve credentials after 3 retries. Giving up")
@@ -1040,14 +1115,14 @@ class OAuthCallbackHandler(webapp.RequestHandler):
                         
         except Exception, e:
             logging.exception(fn_name + "Caught top-level exception")
-            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % shared.get_exception_msg(e))
+            self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % shared.get_exception_msg(e))
             logging.debug(fn_name + "<End> due to exception" )
             logservice.flush()
 
         
 
 def real_main():
-    logging.debug("main(): Starting tasks-backup (app version %s)" %appversion.version)
+    logging.debug("main(): Starting import-tasks (app version %s)" %appversion.version)
     template.register_template_library("common.customdjango")
 
     application = webapp.WSGIApplication(

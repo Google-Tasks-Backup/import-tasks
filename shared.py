@@ -16,7 +16,7 @@
 #
 # Original Google Tasks Porter, modified by Julie Smith 2012
 
-# This module contains code whis is common between classes, or between tasks-backup.py and worker.py
+# This module contains code whis is common between classes, or between import-tasks.py and worker.py
 # Can't use the name common, because there is already a module named common
 
 from apiclient.oauth2client import appengine
@@ -163,7 +163,7 @@ def send_job_to_worker(self, process_tasks_job):
         
     except Exception, e:
         logging.exception(fn_name + "Caught top-level exception")
-        self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % get_exception_msg(e))
+        self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % get_exception_msg(e))
         logging.debug(fn_name + "<End> due to exception" )
         logservice.flush()
 
@@ -252,12 +252,30 @@ def redirect_for_auth(self, user, redirect_url=None):
             # By default, return to the same page
             redirect_url = self.request.path_qs
             
+            
+        # According to https://developers.google.com/accounts/docs/OAuth_ref#RequestToken
+        # xoauth_displayname is optional. 
+        #     (optional) String identifying the application. 
+        #     This string is displayed to end users on Google's authorization confirmation page. 
+        #     For registered applications, the value of this parameter overrides the name set during registration and 
+        #     also triggers a message to the user that the identity can't be verified. 
+        #     For unregistered applications, this parameter enables them to specify an application name, 
+        #     In the case of unregistered applications, if this parameter is not set, Google identifies the application 
+        #     using the URL value of oauth_callback; if neither parameter is set, Google uses the string "anonymous".
+        # It seems preferable to NOT supply xoauth_displayname, so that Google doesn't display "identity can't be verified" msg.
+        
+        # flow = client.OAuth2WebServerFlow(
+            # client_id=client_id,
+            # client_secret=client_secret,
+            # scope="https://www.googleapis.com/auth/tasks",
+            # user_agent=user_agent,
+            # xoauth_displayname=product_name,
+            # state=redirect_url)
         flow = client.OAuth2WebServerFlow(
             client_id=client_id,
             client_secret=client_secret,
             scope="https://www.googleapis.com/auth/tasks",
             user_agent=user_agent,
-            xoauth_displayname=product_name,
             state=redirect_url)
 
         callback = self.request.relative_url("/oauth2callback")
@@ -277,7 +295,7 @@ def redirect_for_auth(self, user, redirect_url=None):
         
     except Exception, e:
         logging.exception(fn_name + "Caught top-level exception")
-        self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % get_exception_msg(e))
+        self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % get_exception_msg(e))
         logging.debug(fn_name + "<End> due to exception" )
         logservice.flush()
 
@@ -447,7 +465,7 @@ def serve_message_page(self, msg1, msg2 = None, msg3 = None, show_back_button=Fa
         logservice.flush()
     except Exception, e:
         logging.exception(fn_name + "Caught top-level exception")
-        self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % get_exception_msg(e))
+        self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % get_exception_msg(e))
         logging.debug(fn_name + "<End> due to exception" )
         logservice.flush()
     

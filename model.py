@@ -32,7 +32,7 @@ class Credentials(db.Model):
 
 
 
-class ProcessTasksJob(db.Model):
+class ImportTasksJob(db.Model):
     """ Container used to pass User info (including credentials) to taskqueue task, and return tasks progress
         back to foreground process to be returned to the user.
     

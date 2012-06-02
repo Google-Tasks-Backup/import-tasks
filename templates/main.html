@@ -385,7 +385,7 @@ This is the Django template for the landing page.
         </form>
     </div>
     <div class="no-display" id="import_existing">
-        <form action="/continue" method="GET">
+        <form action="/continue" method="POST">
             <input class="back-button" type="submit" value="Continue importing tasks from previously uploaded file">
             <div class="continue-job-details">
                 {% if total_progress > 0 %}

@@ -48,7 +48,7 @@ import csv
 import model
 import settings
 import appversion # appversion.version is set before the upload process to keep the version number consistent
-import shared # Code whis is common between tasks-backup.py and worker.py
+import shared # Code whis is common between import-tasks.py and worker.py
 import constants
 from shared import DailyLimitExceededError
 
@@ -74,6 +74,7 @@ class ImportJobState(object):
 
     
 def _log_job_state(import_job_state):
+    # DEBUG: TODO: Only log job state for test users
     logging.debug("Job state:" +
         "\n    prev_tasklist_ids = " + str(import_job_state.prev_tasklist_ids) +
         "\n    parents_ids = " + str(import_job_state.parents_ids) +
@@ -89,34 +90,9 @@ def _log_job_state(import_job_state):
     logservice.flush()
     
     
-def _handle_general_error(e, retry_count, err_msg):
-    if retry_count > 0:
-        logging.warning("Error: " + err_msg + ", " + str(retry_count) + " retries remaining: " + shared.get_exception_msg(e))
-        logservice.flush()
-    else:
-        logging.exception("Error: " + err_msg + ". Giving up after " + str(settings.NUM_API_TRIES) + " retries")
-        logservice.flush()
-        self._report_error(err_msg)
-        raise e
-    
-
-def _handle_http_error(e, retry_count, err_msg):
-    if e._get_reason().lower() == "daily limit exceeded":
-        logging.warning("HttpError: " + err_msg + ": " + shared.get_exception_msg(e))
-        logservice.flush()
-        raise DailyLimitExceededError()
-    if retry_count > 0:
-        logging.warning("HttpError: " + err_msg + ", " + str(retry_count) + " retries remaining: " + shared.get_exception_msg(e))
-        logservice.flush()
-    else:
-        logging.exception("HttpError: " + err_msg + ". Giving up after " + str(settings.NUM_API_TRIES) + " retries")
-        logservice.flush()
-        self._report_error(err_msg)
-        raise e
-
 
 class ProcessTasksWorker(webapp.RequestHandler):
-    """ Process tasks according to data in the ProcessTasksJob entity """
+    """ Process tasks according to data in the ImportTasksJob entity """
 
     prev_progress_timestamp = datetime.datetime.now()
     
@@ -151,7 +127,7 @@ class ProcessTasksWorker(webapp.RequestHandler):
                 # ============================================================
                 #       Retrieve the import job DB record for this user
                 # ============================================================
-                self.process_tasks_job = model.ProcessTasksJob.get_by_key_name(self.user_email)
+                self.process_tasks_job = model.ImportTasksJob.get_by_key_name(self.user_email)
                 
                 if self.process_tasks_job is None:
                     logging.error(fn_name + "<End> No DB record")
@@ -220,10 +196,10 @@ class ProcessTasksWorker(webapp.RequestHandler):
                         self.tasks_svc = service.tasks()
                 
                     except apiclient_errors.HttpError, e:
-                        _handle_http_error(e, retry_count, "Error connecting to Tasks services")
+                        self._handle_http_error(e, retry_count, "Error connecting to Tasks services")
                         
                     except Exception, e:
-                        _handle_general_error(e, retry_count, "Error connecting to Tasks services")
+                        self._handle_general_error(e, retry_count, "Error connecting to Tasks services")
                     
                     # ===================================
                     #           Import tasks
@@ -465,7 +441,7 @@ class ProcessTasksWorker(webapp.RequestHandler):
                             # Add tasks to existing tasklist
                             self.import_job_state.tasklist_id = existing_tasklist_id
                             
-                    if import_method in constants.ImportMethod.CREATE_NEW_TASKLIST_VALUES:
+                    if import_method in constants.ImportMethod.CREATE_NEW_TASKLIST_VALUES or not existing_tasklist_id:
                         # ----------------------------------
                         #       Create new tasklist
                         # ----------------------------------
@@ -640,7 +616,7 @@ class ProcessTasksWorker(webapp.RequestHandler):
                                 "\n    Depth = " + str(depth) +
                                 "\n    body = " + str(task_row_data))
                             logservice.flush()
-                        _handle_http_error(e, retry_count, "Error creating task from data row " + str(self.import_job_state.data_row_num))
+                        self._handle_http_error(e, retry_count, "Error creating task from data row " + str(self.import_job_state.data_row_num))
                         
                     except Exception, e:
                         if retry_count == 0:    
@@ -653,7 +629,7 @@ class ProcessTasksWorker(webapp.RequestHandler):
                                 "\n    Depth = " + str(depth) +
                                 "\n    body = " + str(task_row_data))
                             logservice.flush()
-                        _handle_general_error(e, retry_count, "Error creating task from data row " + str(self.import_job_state.data_row_num))
+                        self._handle_general_error(e, retry_count, "Error creating task from data row " + str(self.import_job_state.data_row_num))
 
                             
                     if retry_count <= 2:
@@ -820,10 +796,10 @@ class ProcessTasksWorker(webapp.RequestHandler):
                     break
                 
                 except apiclient_errors.HttpError, e:
-                    _handle_http_error(e, retry_count, "Error retrieving list of tasklists")
+                    self._handle_http_error(e, retry_count, "Error retrieving list of tasklists")
                     
                 except Exception, e:
-                    _handle_general_error(e, retry_count, "Error retrieving list of tasklists")
+                    self._handle_general_error(e, retry_count, "Error retrieving list of tasklists")
         
             if self.is_test_user and settings.DUMP_DATA:
                 logging.debug(fn_name + "tasklists_data ==>")
@@ -942,15 +918,18 @@ class ProcessTasksWorker(webapp.RequestHandler):
                     # ----------------------------
                     action_str = "deleting"
                     self.tasklists_svc.delete(tasklist=tasklist_id).execute()
+                    # DEBUG: TODO: Only log tasklist_name & ID for test users
                     logging.debug(fn_name + "Deleted tasklist '" + str(tasklist_name) + "', id = " + str(tasklist_id))
                     logservice.flush()
                 break
                 
             except apiclient_errors.HttpError, e:
-                _handle_http_error(e, retry_count, "Error " + action_str + " tasklist '" + str(tasklist_name) + "', id = " + str(tasklist_id))
+                # DEBUG: TODO: Only log tasklist_name & ID for test users
+                self._handle_http_error(e, retry_count, "Error " + action_str + " tasklist '" + str(tasklist_name) + "', id = " + str(tasklist_id))
                 
             except Exception, e:
-                _handle_general_error(e, retry_count, "Error " + action_str + " tasklist '" + str(tasklist_name) + "', id = " + str(tasklist_id))
+                # DEBUG: TODO: Only log tasklist_name & ID for test users
+                self._handle_general_error(e, retry_count, "Error " + action_str + " tasklist '" + str(tasklist_name) + "', id = " + str(tasklist_id))
                     
                     
     def _delete_tasklists(self, tasklists):
@@ -1009,6 +988,31 @@ class ProcessTasksWorker(webapp.RequestHandler):
         # Import process terminated, so delete the blobstore
         shared.delete_blobstore(self.blob_info)
 
+
+    def _handle_http_error(self, e, retry_count, err_msg):
+        if e._get_reason().lower() == "daily limit exceeded":
+            logging.warning("HttpError: " + err_msg + ": " + shared.get_exception_msg(e))
+            logservice.flush()
+            raise DailyLimitExceededError()
+        if retry_count > 0:
+            logging.warning("HttpError: " + err_msg + ", " + str(retry_count) + " retries remaining: " + shared.get_exception_msg(e))
+            logservice.flush()
+        else:
+            logging.exception("HttpError: " + err_msg + ". Giving up after " + str(settings.NUM_API_TRIES) + " retries")
+            logservice.flush()
+            self._report_error(err_msg)
+            raise e
+
+
+    def _handle_general_error(self, e, retry_count, err_msg):
+        if retry_count > 0:
+            logging.warning("Error: " + err_msg + ", " + str(retry_count) + " retries remaining: " + shared.get_exception_msg(e))
+            logservice.flush()
+        else:
+            logging.exception("Error: " + err_msg + ". Giving up after " + str(settings.NUM_API_TRIES) + " retries")
+            logservice.flush()
+            self._report_error(err_msg)
+            raise e
         
     def _update_progress(self, msg=None, force=False):
         """ Update progress so that job doesn't stall """
