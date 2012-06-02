@@ -428,8 +428,9 @@ def get_credentials(self):
     return result, user, credentials, fail_msg, fail_reason
 
   
-def serve_message_page(self, msg1, msg2 = None, msg3 = None, show_back_button=False):
-    """ Serve message.html page to user with message, and (optionally) a Back button """
+def serve_message_page(self, msg1, msg2 = None, msg3 = None, show_back_button=False, 
+        show_custom_button=False, custom_button_text='Try again', custom_button_url=settings.MAIN_PAGE_URL):
+    """ Serve message.html page to user with message, with an optional button (Back, or custom URL)"""
     fn_name = "serve_message_page: "
 
     logging.debug(fn_name + "<Start>")
@@ -453,6 +454,9 @@ def serve_message_page(self, msg1, msg2 = None, msg3 = None, show_back_button=Fa
                            'msg2': msg2,
                            'msg3': msg3,
                            'show_back_button' : show_back_button,
+                           'show_custom_button' : show_custom_button,
+                           'custom_button_text' : custom_button_text,
+                           'custom_button_url' : custom_button_url,
                            'product_name' : product_name,
                            'url_discussion_group' : settings.url_discussion_group,
                            'email_discussion_group' : settings.email_discussion_group,

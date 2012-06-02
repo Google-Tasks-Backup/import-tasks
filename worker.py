@@ -287,7 +287,16 @@ class ProcessTasksWorker(webapp.RequestHandler):
             # file_name = str(self.blob_info.filename)
             # logging.debug(fn_name + "Filename = " + file_name + ", key = " + str(blob_key))
             # logservice.flush()
-            csv_reader=csv.DictReader(blob_reader,dialect='excel')
+            logging.debug(fn_name + "Filetype: '" + str(self.process_tasks_job.file_type) + "'")
+            logservice.flush()
+            if self.process_tasks_job.file_type == 'gtbak': 
+                # Data file contains two pickled values; file_format_version & tasks_data
+                # We need to read file_format_version first, so we can get to tasks_data, but we can 
+                # ignore the value of file_format_version here, because it was already checked in import_tasks.py
+                file_format_version = pickle.load(blob_reader) 
+                tasks_data = pickle.load(blob_reader)
+            else:
+                tasks_data=csv.DictReader(blob_reader,dialect='excel')
             
             import_method = self.process_tasks_job.import_method
             
@@ -319,7 +328,13 @@ class ProcessTasksWorker(webapp.RequestHandler):
                 logging.debug(fn_name + "Skipping first " + str(self.import_job_state.data_row_num) + " data rows")
                 dummy_data_row_num = 0
                 while dummy_data_row_num < self.import_job_state.data_row_num:
-                    csv_reader.next()
+                    if self.process_tasks_job.file_type == 'gtbak':
+                        # Pop the task from the start of the list
+                        tasks_data.pop(0)
+                    else:
+                        # Skip the row in the CSV file
+                        tasks_data.next()
+                    
                     dummy_data_row_num = dummy_data_row_num + 1
             else:
                 # -----------------------
@@ -357,19 +372,20 @@ class ProcessTasksWorker(webapp.RequestHandler):
             
             prev_progress_timestamp = datetime.datetime.now()
         
-            for task_row_data in csv_reader:
+            for task_row_data in tasks_data:
                 self.import_job_state.data_row_num = self.import_job_state.data_row_num + 1
                 
-                # -------------------------------------------------------
-                #       Check that row has valid number of columns
-                # -------------------------------------------------------
-                if len(task_row_data) != 9 or task_row_data.get('restkey'):
-                    # Invalid number of columns
-                    self._report_error("Data row " + str(self.import_job_state.data_row_num) + " has " + str(len(task_row_data)) + 
-                        " columns, expected 9")
-                    logging.debug(fn_name + "<End> due to invalid number of columns")
-                    logservice.flush()
-                    return 
+                if self.process_tasks_job.file_type == 'csv':
+                    # ----------------------------------------------------------
+                    #       Check that CSV row has valid number of columns
+                    # ----------------------------------------------------------
+                    if len(task_row_data) != 9 or task_row_data.get('restkey'):
+                        # Invalid number of columns
+                        self._report_error("Data row " + str(self.import_job_state.data_row_num) + " has " + str(len(task_row_data)) + 
+                            " columns, expected 9")
+                        logging.debug(fn_name + "<End> due to invalid number of columns")
+                        logservice.flush()
+                        return 
 
                 # -------------------------------------------
                 #       Check for valid 'status' value
@@ -979,7 +995,8 @@ class ProcessTasksWorker(webapp.RequestHandler):
         self.process_tasks_job.job_progress_timestamp = datetime.datetime.now()
         # Current data row was NOT processed, so change data_row_num so it now refers to last successfully imported row
         # data_row_num is incremented at the start of the task processing loop
-        self.import_job_state.data_row_num = self.import_job_state.data_row_num - 1
+        if self.import_job_state:
+            self.import_job_state.data_row_num = self.import_job_state.data_row_num - 1
         self.process_tasks_job.pickled_import_state = pickle.dumps(self.import_job_state)
         self.process_tasks_job.total_progress = self.import_job_state.num_of_imported_tasks
         self._log_job_progress()

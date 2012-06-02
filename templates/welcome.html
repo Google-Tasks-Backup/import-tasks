@@ -23,6 +23,8 @@ This is the Django template for the landing page.
         <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css" />
         <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
         <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+        <script type="text/javascript" src="/static/jquery.js"></script>
+        <script type="text/javascript" src="/static/popup.js"></script>
         <script type="text/javascript">
 
             function authorise() {
@@ -95,13 +97,195 @@ This is the Django template for the landing page.
     {% endif %}
     
     <div class="take-note-larger break">
-        {{ app_title }} can import tasks from a specially-crafted CSV file into your Google account.
+        {{ app_title }} can import tasks into your Google account
+    </div>
+
+    <div class="break">
+        There are several methods for importing tasks;
+        <table  cellspacing="0" class="format-selection" id="import_method_table">
+            <tr>
+                <td class="format-name">
+                    {{ APPEND_TIMESTAMP }}
+                </td>
+                <td>
+                    Append datetime to imported tasklist names</input> i.e., <span class="fixed-font smaller-font">"My Tasklist"</span> becomes <span class="fixed-font smaller-font">"My Tasklist 2012-01-31 19:37:04"</span>
+                </td>
+            </tr>
+            <tr>
+                <td class="format-name">
+                    {{ USE_OWN_SUFFIX }}
+                </td>
+                <td>
+                    Append your own suffix 
+                    <img class="popupTrigger" id="help-USE_OWN_SUFFIX" src="/static/help.png" alt="Display help">
+                    <div class="popupContent" id="help-USE_OWN_SUFFIX-content">
+                        <img class="popupClose" src="/static/close.png" alt="Close">
+                        <div class="clear">
+                            For each tasklist in the imported data, create a new tasklist (with the suffix)
+                            containing only the imported tasks for that tasklist.
+                        </div>
+                        <div class="medium-break">
+                            For example, if the imported task is in a tasklist name "Shopping" and you choose a suffix "New", 
+                            the task will be imported into a new tasklist named "ShoppingNew". 
+                        </div>
+                        <div class="comment medium-break">
+                            Note that no space is added, to allow direct concatenation. If you wish to have a space between the existing
+                            tasklist name and the suffix, then include that space in the start of the suffix field.
+                        </div>
+                        <div class="medium-break">
+                            NOTE: Google allows duplicate tasklists names. If a tasklist already exists with the new name (e.g., "ShoppingNew"),
+                            the import process will simply create another tasklist called "ShoppingNew", which will contain all the imported tasks
+                            that were in the "Shopping" tasklist. Existing tasklists will not be altered.
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td class="format-name">
+                    {{ ADD_TO_EXISTING_TASKLIST }}
+                </td>
+                <td>
+                    Add imported tasks to existing tasklist. 
+                    <img class="popupTrigger" id="help-ADD_TO_EXISTING_TASKLIST" src="/static/help.png" alt="Display help">
+                    <div class="popupContent" id="help-ADD_TO_EXISTING_TASKLIST-content">
+                        <img class="popupClose" src="/static/close.png" alt="Close">
+                        <div class="clear">
+                            For each tasklist in the imported data;
+                            <ol>
+                                <li>
+                                    If the tasklist for an imported tasks already exists;
+                                    <ul>
+                                        <li>
+                                            Imported tasks will be inserted at the top of the list (that is, before existing tasks in the Google tasks view).
+                                        </li>
+                                        <li>
+                                            NOTE: All tasks in the imported data will be created, even if that task already exists. (It is not possible to check for duplicate tasks.)
+                                        </li>
+                                    </ul>
+                                <li>
+                                    If the tasklist does not exist;
+                                    <ul>
+                                        <li>
+                                            Create a new tasklist containing only the imported tasks.
+                                        </li>
+                                    </ul>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td class="format-name">
+                    {{ REPLACE_TASKLIST_CONTENT }}
+                </td>
+                <td>
+                    Replace tasklist content with imported tasks. 
+                    <img class="popupTrigger" id="help-REPLACE_TASKLIST_CONTENT" src="/static/help.png" alt="Display help">
+                    <div class="popupContent" id="help-REPLACE_TASKLIST_CONTENT-content">
+                        <img class="popupClose" src="/static/close.png" alt="Close">
+                        <div class="clear medium-break">
+                            For each tasklist in the imported data;
+                            <ul class="no-bullets">
+                                <li>
+                                    If a tasklist with the same name exists, delete the existing tasklist (and all the tasks in it).
+                                    <div class="comment medium-break">
+                                        Note that if multiple tasklists exist with the same name, only ONE of those tasklists will be deleted.
+                                        There will therefore still be multiple tasklists with the same name after the import.
+                                    </div>
+                                </li>
+                                <li>
+                                    Create a new tasklist containing only the imported tasks.
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td class="format-name">
+                    {{ SKIP_DUPLICATE_TASKLIST }}
+                </td>
+                <td>
+                    If tasklist with the same name exists, do not import tasks from that tasklist. 
+                    <img class="popupTrigger" id="help-SKIP_DUPLICATE_TASKLIST" src="/static/help.png" alt="Display help">
+                    <div class="popupContent" id="help-SKIP_DUPLICATE_TASKLIST-content">
+                        <img class="popupClose" src="/static/close.png" alt="Close">
+                        <div class="clear break">
+                            Tasks will only be imported for tasklists that do NOT exist.
+                        </div>
+                        <div class="break">
+                            For each tasklist in the imported data;
+                            <ul>
+                                <li>
+                                    If a tasklist exists with the same name as the task to be imported, skip importing for that tasklist. 
+                                    That is, do not import tasks for a tasklist if a tasklist with that name already exists. 
+                                </li>
+                                <li>
+                                    If the tasklist does not exist, create a new tasklist containing only the imported tasks.
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td class="format-name">
+                    {{ DELETE_BEFORE_IMPORT }}
+                </td>
+                <td>
+                    Delete ALL existing tasklists before importing.
+                    <img class="popupTrigger" id="help-DELETE_BEFORE_IMPORT" src="/static/help.png" alt="Display help">
+                    <img class="popupTrigger" id="help-DELETE_BEFORE_IMPORT" src="/static/warning.png" alt="Display warning">
+                    <div class="popupContent" id="help-DELETE_BEFORE_IMPORT-content">
+                        <img class="popupClose" src="/static/close.png" alt="Close">
+                        <img src="/static/warning_32.png" alt="Display warning">
+                        <ul class="clear">
+                            <li>
+                                <span style="color:red;">WARNING:</span> Choosing this option means that ALL existing tasklists (and their contents) will be deleted!
+                                <ul>
+                                    <li>
+                                        NOTE: Google does not allow the default tasklist to be deleted.
+                                        The default tasklist is usually named "Default List" or
+                                        "My account name list", but can have any name. It is not necessarily the first tasklist in the list of tasklists. 
+                                    </li>
+                                    <li>
+                                        The default tasklist will be renamed with a unique name, but the contents of the default list will not be modified.
+                                    </li>
+                                </ul>
+                            </li>
+                            <li>
+                                For each tasklist in the imported data, create a new tasklist containing only the imported tasks.
+                            </li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+        
+        </table>
+        
+        
+        
+        
+    </div>        
+        
+    <div class="break">    
+        Tasks may be imported from a GTBak file (created by <a href="http://{{ url_GTB }}">Google Tasks Backup</a>), or from a specially-crafted CSV file.
     </div>
     <div class="break">
-        For details of the import file format, refer to the <a href="/static/info.html#import_export_description">information page</a>. You can create a suitable import file by running <a href="http://{{ url_GTB }}">Google Tasks Backup</a>,
-        which also supports various other export formats.
+        If your tasks contain international or extended characters, it is recommended to import using the GTBak format.
+    </div>
+    <div class="break">
+        For details of the CSV import file format, refer to the <a href="/static/info.html#import_export_description">information page</a>.
+        The CSV format may not support all international or extended characters, but may be edited by a text editor such as
+        <a href="http://notepad-plus-plus.org/">Notepad++</a> before being imported. It is not recommended to edit the CSV file with a spreadsheet program, as programs such as Excel and OpenOffice Calc tend to corrupt the data.
+    </div>
+    <div class="break">
+        <a href="http://{{ url_GTB }}">Google Tasks Backup</a> can export tasks in several formats, but only the Import/Export CSV and GTBak formats can be imported using this application.
     </div>
     
+    <div class="break">
+    </div>
     <div class="break comment">
         Note that {{ app_title }} does not (yet) support import from Outlook CSV files. 
         Support for Outlook CSV may be added if sufficient people request it at <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a>

@@ -77,6 +77,12 @@
   </head>
   
   <body>
+  
+    {% if show_custom_button %}
+        <form>
+            <input type="button" class="back-button" onClick="window.location.href = '{{ custom_button_url }}'" value="{{ custom_button_text }}">
+        </form>
+    {% endif %}
 
     <h2>{{ app_title }}</h2>
   

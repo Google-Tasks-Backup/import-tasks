@@ -111,6 +111,12 @@ class WelcomeHandler(webapp.RequestHandler):
                                'url_main_page' : settings.MAIN_PAGE_URL,
                                'manage_blobstore_url' : settings.ADMIN_MANAGE_BLOBSTORE_URL,
                                'msg': self.request.get('msg'),
+                               'APPEND_TIMESTAMP' : constants.ImportMethod.APPEND_TIMESTAMP,
+                               'USE_OWN_SUFFIX' : constants.ImportMethod.USE_OWN_SUFFIX,
+                               'ADD_TO_EXISTING_TASKLIST' : constants.ImportMethod.ADD_TO_EXISTING_TASKLIST,
+                               'REPLACE_TASKLIST_CONTENT' : constants.ImportMethod.REPLACE_TASKLIST_CONTENT,
+                               'SKIP_DUPLICATE_TASKLIST' : constants.ImportMethod.SKIP_DUPLICATE_TASKLIST,
+                               'DELETE_BEFORE_IMPORT' : constants.ImportMethod.DELETE_BEFORE_IMPORT,
                                'logout_url': users.create_logout_url(settings.WELCOME_PAGE_URL),
                                'url_discussion_group' : settings.url_discussion_group,
                                'email_discussion_group' : settings.email_discussion_group,
@@ -494,113 +500,213 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                     shared.delete_blobstore(blob_info)
                     logging.debug(fn_name + "<End> due to empty upload file")
                     logservice.flush()
-                    shared.serve_message_page(self, err_msg, show_back_button=True)
+                    shared.serve_message_page(self, err_msg, show_custom_button=True)
                     return
                 
                 file_upload_time = blob_info.creation
                 file_name = str(blob_info.filename)
                 
-                # -------------------------------------------
-                #       Check if file format is valid
-                # -------------------------------------------
-                try:
-                    num_data_rows = 0
-                    blob_reader = blobstore.BlobReader(blob_key)
-                    csv_reader=csv.reader(blob_reader,dialect='excel')
-                    
-                    # -----------------------------
-                    #       Check header row
-                    # -----------------------------
-                    header_row = csv_reader.next() # Header row
-                    for c in header_row:
-                        # Check that column names are correct
-                        if c not in ("tasklist_name","title","notes","status","due","completed","deleted","hidden","depth"):
-                            err_msg1 = "Error in uploaded file - invalid column name '" + c + "' in header row; " + str(header_row)
+                if shared.isTestUser(user_email):
+                    logging.debug(fn_name + "Filename: '" + str(file_name) + "'")
+                
+                file_type = None
+                if file_name.lower().endswith('.csv'):
+                    file_type = 'csv'
+                elif file_name.lower().endswith('.gtbak'):
+                    file_type = 'gtbak'
+                else:
+                    # -----------------------------------------
+                    #       Invalid file name extension
+                    # -----------------------------------------
+                    err_msg = str(file_name) + " is an unsupported file type. Only .csv or .GTBak is supported."
+                    logging.info(fn_name + err_msg)
+                    # Import process terminated, so delete the blobstore
+                    shared.delete_blobstore(blob_info)
+                    logging.debug(fn_name + "<End> (invalid file extension)")
+                    logservice.flush()
+                    shared.serve_message_page(self, err_msg, show_custom_button=True)
+                    return
+                
+                logging.debug(fn_name + "Filetype: '" + str(file_type) + "'")
+                logservice.flush()
+
+                
+                if file_type == 'csv':
+                    # -----------------------------------------------
+                    #       Check if CSV file format is valid
+                    # -----------------------------------------------
+                    try:
+                        num_data_rows = 0
+                        blob_reader = blobstore.BlobReader(blob_key)
+                        csv_reader=csv.reader(blob_reader,dialect='excel')
+                        
+                        # -----------------------------
+                        #       Check header row
+                        # -----------------------------
+                        header_row = csv_reader.next() # Header row
+                        for c in header_row:
+                            # Check that column names are correct
+                            if c not in ("tasklist_name","title","notes","status","due","completed","deleted","hidden","depth"):
+                                err_msg1 = "Error in uploaded file - invalid column name '" + c + "' in header row; " + str(header_row)
+                                err_msg2 = """Header row must be: "tasklist_name","title","notes","status","due","completed","deleted","hidden","depth" """
+                                logging.info(fn_name + err_msg1)
+                                # Import process terminated, so delete the blobstore
+                                shared.delete_blobstore(blob_info)
+                                logging.debug(fn_name + "<End> due to invalid CSV header column names")
+                                logservice.flush()
+                                shared.serve_message_page(self, err_msg1, err_msg2, show_custom_button=True)
+                                return
+                                
+                        if len(header_row) != 9:
+                            err_msg1 = "Error in uploaded file - found " + len(header_row) + " columns in header row, expected 9; " + str(header_row)
                             err_msg2 = """Header row must be: "tasklist_name","title","notes","status","due","completed","deleted","hidden","depth" """
                             logging.info(fn_name + err_msg1)
                             # Import process terminated, so delete the blobstore
                             shared.delete_blobstore(blob_info)
-                            logging.debug(fn_name + "<End> due to invalid header column names")
+                            logging.debug(fn_name + "<End> due to invalid number of CSV header columns")
                             logservice.flush()
-                            shared.serve_message_page(self, err_msg1, err_msg2, show_back_button=True)
+                            shared.serve_message_page(self, err_msg1, err_msg2, show_custom_button=True)
                             return
+                        
+                        # --------------------------------
+                        #       Check first data row
+                        # --------------------------------
+                        first_data_row = csv_reader.next() # First data row
+                        num_data_rows = 1
+                        if len(first_data_row) != 9:
+                            err_msg1 = "Error in uploaded file - found " + len(first_data_row) + " columns in first data row, expected 9; " + str(first_data_row)
+                            err_msg2 = """Data rows must contain 9 columns: "tasklist_name","title","notes","status","due","completed","deleted","hidden",depth """
+                            err_msg3 = """Values for "tasklist_name", "title", "status" and "depth" are mandatory. Other columns may be empty."""
+                            logging.info(fn_name + err_msg1)
+                            # Import process terminated, so delete the blobstore
+                            shared.delete_blobstore(blob_info)
+                            logging.debug(fn_name + "<End> due to invalid number of CSV data columns")
+                            logservice.flush()
+                            shared.serve_message_page(self, err_msg1, err_msg2, err_msg3, show_custom_button=True)
+                            return
+                        
+                        
+                        # Check if depth value of first data row is valid (must be zero, as first task must be a root task)
+                        err_msg = None
+                        try:
+                            depth = int(first_data_row[8])
+                            if depth != 0:
+                                # First task imported must have depth of zero; it must be a root task
+                                err_msg = "Invalid depth [" + str(depth) + "] of first task; First task must have depth = 0"
+                        except Exception, e:
+                            err_msg = "Invalid depth value [" + str(task['depth']) + "] for first data row: " + str(e)
+                        if err_msg:    
+                            err_msg1 = "Unable to import file"
+                            logging.info(fn_name + err_msg)
+                            logservice.flush()
+                            # Import process terminated, so delete the blobstore
+                            shared.delete_blobstore(blob_info)
+                            logging.debug(fn_name + "<End> due to invalid depth value in CSV data")
+                            logservice.flush()
+                            shared.serve_message_page(self, err_msg1, err_msg, show_custom_button=True)
+                            return 
                             
-                    if len(header_row) != 9:
-                        err_msg1 = "Error in uploaded file - found " + len(header_row) + " columns in header row, expected 9; " + str(header_row)
-                        err_msg2 = """Header row must be: "tasklist_name","title","notes","status","due","completed","deleted","hidden","depth" """
-                        logging.info(fn_name + err_msg1)
+                            
+                    except StopIteration:
+                        err_msg1 = "Unable to import file"
+                        err_msg2 = "Uploaded CSV file does not contain sufficient data"
+                        logging.info(fn_name + err_msg2)
                         # Import process terminated, so delete the blobstore
                         shared.delete_blobstore(blob_info)
-                        logging.debug(fn_name + "<End> due to invalid number of header columns")
+                        logging.debug(fn_name + "<End> due to insufficient data in CSV file" )
                         logservice.flush()
-                        shared.serve_message_page(self, err_msg1, err_msg2, show_back_button=True)
+                        shared.serve_message_page(self, err_msg1, err_msg2, show_custom_button=True)
                         return
-                    
-                    # --------------------------------
-                    #       Check first data row
-                    # --------------------------------
-                    first_data_row = csv_reader.next() # First data row
-                    num_data_rows = 1
-                    if len(first_data_row) != 9:
-                        err_msg1 = "Error in uploaded file - found " + len(first_data_row) + " columns in first data row, expected 9; " + str(first_data_row)
-                        err_msg2 = """Data rows must contain 9 columns: "tasklist_name","title","notes","status","due","completed","deleted","hidden",depth """
-                        err_msg3 = """Values for "tasklist_name", "title", "status" and "depth" are mandatory. Other columns may be empty."""
-                        logging.info(fn_name + err_msg1)
-                        # Import process terminated, so delete the blobstore
-                        shared.delete_blobstore(blob_info)
-                        logging.debug(fn_name + "<End> due to invalid number of data columns")
-                        logservice.flush()
-                        shared.serve_message_page(self, err_msg1, err_msg2, err_msg3, show_back_button=True)
-                        return
-                    
-                    
-                    # Check if depth value of first data row is valid (must be zero, as first task must be a root task)
-                    err_msg = None
-                    try:
-                        depth = int(first_data_row[8])
-                        if depth != 0:
-                            # First task imported must have depth of zero; it must be a root task
-                            err_msg = "Invalid depth [" + str(depth) + "] of first task; First task must have depth = 0"
-                    except Exception, e:
-                        err_msg = "Invalid depth value [" + str(task['depth']) + "] for first data row: " + str(e)
-                    if err_msg:    
-                        logging.info(fn_name + err_msg)
-                        logservice.flush()
-                        # Import process terminated, so delete the blobstore
-                        shared.delete_blobstore(blob_info)
-                        logging.debug(fn_name + "<End> due to invalid depth value")
-                        logservice.flush()
-                        shared.serve_message_page(self, err_msg, show_back_button=True)
-                        return 
-                        
-                        
-                except StopIteration:
-                    err_msg = "Uploaded file does not contain sufficient data"
-                    logging.info(fn_name + err_msg)
-                    # Import process terminated, so delete the blobstore
-                    shared.delete_blobstore(blob_info)
-                    logging.debug(fn_name + "<End> due to insufficient data in file" )
-                    logservice.flush()
-                    shared.serve_message_page(self, err_msg, show_back_button=True)
-                    return
 
-                except Exception, e:
-                    logging.exception(fn_name + "Error testing uploaded CSV file")
-                    err_msg1 = "Error processing uploaded CSV file"
-                    err_msg2 = shared.get_exception_msg(e)
-                    # Import process terminated, so delete the blobstore
-                    shared.delete_blobstore(blob_info)
-                    logging.debug(fn_name + "<End> due to error" )
-                    logservice.flush()
-                    shared.serve_message_page(self, err_msg1, err_msg2, show_back_button=True)
-                    return
-                
-                # Read the rest of the file so we know how many data rows there are
-                num_data_rows = 1 # We already read and checked the first data row
-                for data_row in csv_reader:
-                    num_data_rows = num_data_rows + 1
-                logging.debug(fn_name + "Data file (potentially) contains " + str(num_data_rows) + " tasks")
-                
+                    except Exception, e:
+                        logging.exception(fn_name + "Error testing uploaded CSV file")
+                        err_msg1 = "Error processing uploaded CSV file"
+                        err_msg2 = shared.get_exception_msg(e)
+                        # Import process terminated, so delete the blobstore
+                        shared.delete_blobstore(blob_info)
+                        logging.debug(fn_name + "<End> due to error parsing CSV file" )
+                        logservice.flush()
+                        shared.serve_message_page(self, err_msg1, err_msg2, show_custom_button=True)
+                        return
+                    
+                    # Read the rest of the file so we know how many data rows there are
+                    num_data_rows = 1 # We already read and checked the first data row
+                    for data_row in csv_reader:
+                        num_data_rows = num_data_rows + 1
+                elif file_type == 'gtbak':
+                    try:
+                        # -----------------------------------------
+                        #       Check if GTBak file is valid
+                        # -----------------------------------------
+                        minimum_element_list = [u'tasklist_name', u'title', u'status', u'depth']
+                        num_data_rows = 0
+                        blob_reader = blobstore.BlobReader(blob_key)
+                        file_format_version = pickle.load(blob_reader)
+                        if file_format_version != 'v1.0':
+                            err_msg1 = "Unable to import file"
+                            err_msg2 = "This file was created with an incompatible version of GTB"
+                            logging.info(fn_name + err_msg2)
+                            # Import process terminated, so delete the blobstore
+                            shared.delete_blobstore(blob_info)
+                            logging.debug(fn_name + "<End> (invalid GTBak file format version)")
+                            logservice.flush()
+                            shared.serve_message_page(self, err_msg1, err_msg2, show_custom_button=True)
+                            return
+                        
+                        tasks_data = pickle.load(blob_reader)
+                        for task in tasks_data:
+                            num_data_rows = num_data_rows + 1
+                            # Check minimal requirements for each task; tasklist_name, title, status, depth
+                            for k in minimum_element_list:
+                                if not task.has_key(k):
+                                    err_msg1 = "Unable to import file"
+                                    err_msg2 = "Task " + str(num_data_rows) + " is missing '" + k + "'"
+                                    logging.info(fn_name + err_msg2)
+                                    # Import process terminated, so delete the blobstore
+                                    shared.delete_blobstore(blob_info)
+                                    logging.debug(fn_name + "<End> (missing task element in GTBak file)")
+                                    logservice.flush()
+                                    shared.serve_message_page(self, err_msg1, err_msg2, show_custom_button=True)
+                                    return
+                            if num_data_rows == 1:
+                                # Depth of 1st task must be zero)
+                                depth = int(task['depth'])
+                                if depth != 0:
+                                    # First task imported must have depth of zero; it must be a root task
+                                    err_msg1 = "Unable to import file"
+                                    err_msg2 = "Invalid depth [" + str(depth) + "] of first task; First task must have depth = 0"
+                                    logging.info(fn_name + err_msg2)
+                                    logservice.flush()
+                                    # Import process terminated, so delete the blobstore
+                                    shared.delete_blobstore(blob_info)
+                                    logging.debug(fn_name + "<End> (non-zero depth of first task in GTBak file)")
+                                    logservice.flush()
+                                    shared.serve_message_page(self, err_msg1, err_msg2, show_custom_button=True)
+                                    return                                 
+                                
+                        if num_data_rows == 0:
+                            err_msg1 = "Unable to import file"
+                            err_msg2 = "Import file contains no tasks"
+                            logging.info(fn_name + err_msg2)
+                            # Import process terminated, so delete the blobstore
+                            shared.delete_blobstore(blob_info)
+                            logging.debug(fn_name + "<End> (no tasks in GTBak file)")
+                            logservice.flush()
+                            shared.serve_message_page(self, err_msg1, err_msg2, show_custom_button=True)
+                            return
+                    except Exception, e:
+                        err_msg1 = "Error reading import file"
+                        err_msg2 = "The data is not in the correct GTBak format: " + shared.get_exception_msg(e)
+                        logging.info(fn_name + err_msg2)
+                        # Import process terminated, so delete the blobstore
+                        shared.delete_blobstore(blob_info)
+                        logging.debug(fn_name + "<End> (exception parsing GTBak file)")
+                        logservice.flush()
+                        shared.serve_message_page(self, err_msg, show_custom_button=True)
+                        return
+
+                logging.debug(fn_name + "Import data file (potentially) contains " + str(num_data_rows) + " tasks")
+                    
                 # Determine the chosen import method (and optional suffix)
                 import_method = self.request.get('import_method') # How to process the import
                 if import_method == constants.ImportMethod.APPEND_TIMESTAMP:
@@ -620,6 +726,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                 process_tasks_job.user = user
                 process_tasks_job.total_num_rows_to_process = num_data_rows
                 process_tasks_job.blobstore_key = blob_key
+                process_tasks_job.file_type = file_type
                 process_tasks_job.file_name = file_name
                 process_tasks_job.file_upload_time = file_upload_time
                 process_tasks_job.import_tasklist_suffix = import_tasklist_suffix
@@ -648,7 +755,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
             else:
                 logging.debug(fn_name + "<End> due to no file uploaded" )
                 logservice.flush()
-                shared.serve_message_page(self, 'No file uploaded, please try again.', show_back_button=True)
+                shared.serve_message_page(self, 'No file uploaded, please try again.', show_custom_button=True)
                 
                 
         except Exception, e:

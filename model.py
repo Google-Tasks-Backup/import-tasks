@@ -58,6 +58,9 @@ class ImportTasksJob(db.Model):
     # Name of the user's uploaded file. Used to display file details to user when giving the user the option to continue a job
     file_name = db.StringProperty(indexed=False, default=None)
     
+    # Type of uploaded file. Only csv and gtbak are supported
+    file_type = db.StringProperty(indexed=False, default=None)
+    
     # Time that the user uploaded the file. Used to display file details to user when giving the user the option to continue a job
     file_upload_time = db.DateTimeProperty(indexed=False, auto_now_add=True)
     
