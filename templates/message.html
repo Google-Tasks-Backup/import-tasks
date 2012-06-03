@@ -55,7 +55,7 @@
 
         {% if show_back_button %}
             var gb = new backlink();
-            gb.text = "Back to previous page";
+            gb.text = "{{ back_button_text }}";
             gb.type = "button";
             gb.otheratts = 'class="back-button"';
             gb.write();
@@ -80,11 +80,14 @@
   
     {% if show_custom_button %}
         <form>
-            <input type="button" class="back-button" onClick="window.location.href = '{{ custom_button_url }}'" value="{{ custom_button_text }}">
+            <input type="button" class="back-button" onClick="window.location.href = '{{ custom_button_url }}'" 
+                value="{{ custom_button_text }}">
         </form>
     {% endif %}
 
-    <h2>{{ app_title }}</h2>
+    {% if show_heading_messages %}
+        <h2>{{ app_title }}</h2>
+    {% endif %}
   
     <noscript>
         <br />
@@ -92,11 +95,15 @@
         <br />
     </noscript>
     
-    {% if host_msg %}
+    {% if host_msg and show_heading_messages %}
         <div class="break">
         <h3>{{ host_msg }}</h3>
         </div>
     {% endif %}
+    
+    <br />
+    <br />
+    <br />
 
     <div class="break take-note-larger">
         {{ msg1 }}

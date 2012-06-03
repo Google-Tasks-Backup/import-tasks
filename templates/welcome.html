@@ -96,19 +96,19 @@ This is the Django template for the landing page.
         </div>
     {% endif %}
     
-    <div class="take-note-larger break">
-        {{ app_title }} can import tasks into your Google account
+    <div class="medium-break">
+        There are several methods for importing tasks (chosen on next page);
     </div>
-
     <div class="break">
-        There are several methods for importing tasks;
         <table  cellspacing="0" class="format-selection" id="import_method_table">
             <tr>
                 <td class="format-name">
                     {{ APPEND_TIMESTAMP }}
                 </td>
                 <td>
-                    Append datetime to imported tasklist names</input> i.e., <span class="fixed-font smaller-font">"My Tasklist"</span> becomes <span class="fixed-font smaller-font">"My Tasklist 2012-01-31 19:37:04"</span>
+                    Append datetime to imported tasklist names</input>
+                    <br />
+                    e.g. <span class="fixed-font smaller-font">"My Tasklist"</span> becomes <span class="fixed-font smaller-font">"My Tasklist 2012-01-31 19:37:04"</span>
                 </td>
             </tr>
             <tr>
@@ -136,6 +136,24 @@ This is the Django template for the landing page.
                             NOTE: Google allows duplicate tasklists names. If a tasklist already exists with the new name (e.g., "ShoppingNew"),
                             the import process will simply create another tasklist called "ShoppingNew", which will contain all the imported tasks
                             that were in the "Shopping" tasklist. Existing tasklists will not be altered.
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td class="format-name">
+                    {{ IMPORT_AS_IS }}
+                </td>
+                <td>
+                    Import all the tasks into their original tasklist names 
+                    <img class="popupTrigger" id="help-IMPORT_AS_IS" src="/static/help.png" alt="Display help">
+                    <div class="popupContent" id="help-IMPORT_AS_IS-content">
+                        <img class="popupClose" src="/static/close.png" alt="Close">
+                        <div class="clear">
+                            For each tasklist in the imported data, create a new tasklist containing the imported tasks for that tasklist.
+                        </div>
+                        <div class="medium-break">
+                            NOTE: Google allows duplicate tasklists names. If a tasklist already exists with the same name as an imported tasklist, the import process will simply create a new tasklist with the same name. Existing tasklists will not be altered. The nett result will be two tasklists with the same name; one with the existing tasks, and one with the imported tasks.
                         </div>
                     </div>
                 </td>
@@ -269,19 +287,22 @@ This is the Django template for the landing page.
         
     </div>        
         
-    <div class="break">    
-        Tasks may be imported from a GTBak file (created by <a href="http://{{ url_GTB }}">Google Tasks Backup</a>), or from a specially-crafted CSV file.
+    <div class="small-break">
+        {{ app_title }} can import tasks from 2 different <a href="http://{{ url_GTB }}">Google Tasks Backup</a> formats; <span class="take-note">Import/Export GTBak</span> and <span class="take-note">Import/Export CSV</span>. 
+    </div>
+    <div class="break comment">
+        Google Tasks Backup can export tasks in several formats, but only the Import/Export CSV and GTBak formats can be imported using this application.
     </div>
     <div class="break">
-        If your tasks contain international or extended characters, it is recommended to import using the GTBak format.
+        The <span class="take-note">GTBak format is recommened</span>, especially if your tasks contain international or extended characters. 
     </div>
     <div class="break">
         For details of the CSV import file format, refer to the <a href="/static/info.html#import_export_description">information page</a>.
-        The CSV format may not support all international or extended characters, but may be edited by a text editor such as
+        The CSV format does not support all international or extended characters, but may be edited by a text editor such as
         <a href="http://notepad-plus-plus.org/">Notepad++</a> before being imported. It is not recommended to edit the CSV file with a spreadsheet program, as programs such as Excel and OpenOffice Calc tend to corrupt the data.
     </div>
     <div class="break">
-        <a href="http://{{ url_GTB }}">Google Tasks Backup</a> can export tasks in several formats, but only the Import/Export CSV and GTBak formats can be imported using this application.
+        
     </div>
     
     <div class="break">
@@ -294,16 +315,16 @@ This is the Django template for the landing page.
     {% if is_authorized %}
         <button id="start_button" class="big-button" type="button" onclick="start();">Start</button>
     {% else %}
-        <div class="break">
+        <div class="medium-break">
             This application uses Google authentication to access your Tasks data. The permission for this application will be displayed as "{{ product_name }} - Tasks" in your list of 
             <a href="https://www.google.com/accounts/IssuedAuthSubTokens">Authorised Sites, Apps, and Services</a>, and can be revoked there at any time.
         </div>
         <button id="authorise_button" class="big-button" type="button" onclick="authorise();">Authorise</button>
     {% endif %}
     
-    <div class="break">
+    <div class="nice-gap-top break">
         This application is currently in beta. 
-		You are welcome to try it, but I cannot give any guarantee that data retrieved will be correct or in a usable format. 
+		You are welcome to try it, but I cannot give any guarantee that imported tasks will be correct or in a usable format. 
         It is running from my personal Google Apps account, and so has quota limitations. 
     </div>
    

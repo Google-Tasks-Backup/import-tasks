@@ -203,10 +203,20 @@ status constants: STARTING, INITIALISING, IMPORTING, IMPORT_COMPLETED, ERROR
                     {{ job_msg }} 
                 </div>
             </div>
-            
+
+{% comment %}
+<!--            
             <form action="{{ url_main_page }}" method="get">
                 <button type="submit" class="big-button" value="Return to main page">Return to main page</button>
             </form>
+-->
+{% endcomment %}
+
+            <form>
+                <input type="button" class="big-button" onClick="window.location.href = '{{ url_main_page }}'" 
+                    value="Return to main page">
+            </form>
+            
         {% else %}
             <div class="break">
                 Status = {{ status }}

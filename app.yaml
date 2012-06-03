@@ -1,11 +1,11 @@
 
 # ===== Limited Public Test host and version ======
-#application: import-tasks
-#version: 1
+application: import-tasks
+version: 1
 
 # ===== Private Alpha Test host and version ======
-application: js-tasks-test
-version: 1
+#application: js-tasks-test
+#version: 1
 
 # ===== Local host ==========
 #application: import-tasks-local

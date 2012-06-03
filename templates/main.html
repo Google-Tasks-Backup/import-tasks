@@ -198,7 +198,9 @@ This is the Django template for the landing page.
                             {{ APPEND_TIMESTAMP }}
                         </td>
                         <td>
-                            Append datetime to imported tasklist names</input> i.e., <span class="fixed-font smaller-font">"My Tasklist"</span> becomes <span class="fixed-font smaller-font">"My Tasklist 2012-01-31 19:37:04"</span>
+                            Append datetime to imported tasklist names</input>
+                            <br />
+                            e.g. <span class="fixed-font smaller-font">"My Tasklist"</span> becomes <span class="fixed-font smaller-font">"My Tasklist 2012-01-31 19:37:04"</span>
                         </td>
                     </tr>
                     <tr>
@@ -227,6 +229,25 @@ This is the Django template for the landing page.
                                     NOTE: Google allows duplicate tasklists names. If a tasklist already exists with the new name (e.g., "ShoppingNew"),
                                     the import process will simply create another tasklist called "ShoppingNew", which will contain all the imported tasks
                                     that were in the "Shopping" tasklist. Existing tasklists will not be altered.
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="format-name">
+                            <input type="radio" name="import_method" value="{{ IMPORT_AS_IS }}" class="radio-button-left" >
+                            {{ IMPORT_AS_IS }}
+                        </td>
+                        <td>
+                            Import all the tasks into their original tasklist names 
+                            <img class="popupTrigger" id="help-IMPORT_AS_IS" src="/static/help.png" alt="Display help">
+                            <div class="popupContent" id="help-IMPORT_AS_IS-content">
+                                <img class="popupClose" src="/static/close.png" alt="Close">
+                                <div class="clear">
+                                    For each tasklist in the imported data, create a new tasklist containing the imported tasks for that tasklist.
+                                </div>
+                                <div class="medium-break">
+                                    NOTE: Google allows duplicate tasklists names. If a tasklist already exists with the same name as an imported tasklist, the import process will simply create a new tasklist with the same name. Existing tasklists will not be altered. The nett result will be two tasklists with the same name; one with the existing tasks, and one with the imported tasks.
                                 </div>
                             </div>
                         </td>

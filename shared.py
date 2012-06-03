@@ -428,9 +428,20 @@ def get_credentials(self):
     return result, user, credentials, fail_msg, fail_reason
 
   
-def serve_message_page(self, msg1, msg2 = None, msg3 = None, show_back_button=False, 
-        show_custom_button=False, custom_button_text='Try again', custom_button_url=settings.MAIN_PAGE_URL):
-    """ Serve message.html page to user with message, with an optional button (Back, or custom URL)"""
+def serve_message_page(self, msg1, msg2 = None, msg3 = None, 
+        show_back_button=False, 
+        back_button_text="Back to previous page",
+        show_custom_button=False, custom_button_text='Try again', custom_button_url=settings.MAIN_PAGE_URL,
+        show_heading_messages=True):
+    """ Serve message.html page to user with message, with an optional button (Back, or custom URL)
+    
+        msg1, msg2, msg3        Text to be displayed.msg2 and msg3 are option. Each msg is displayed in a separate div
+        show_back_button        If True, a [Back] button is displayed, to return to previous page
+        show_custom_button      If True, display button to jump to any URL. title set by custom_button_text
+        custom_button_text      Text label for custom button
+        custom_button_url       URL to go to when custom button is pressed
+        show_heading_messages   If True, display app_title and (optional) host_msg
+    """
     fn_name = "serve_message_page: "
 
     logging.debug(fn_name + "<Start>")
@@ -453,7 +464,9 @@ def serve_message_page(self, msg1, msg2 = None, msg3 = None, show_back_button=Fa
                            'msg1': msg1,
                            'msg2': msg2,
                            'msg3': msg3,
+                           'show_heading_messages' : show_heading_messages,
                            'show_back_button' : show_back_button,
+                           'back_button_text' : back_button_text,
                            'show_custom_button' : show_custom_button,
                            'custom_button_text' : custom_button_text,
                            'custom_button_url' : custom_button_url,

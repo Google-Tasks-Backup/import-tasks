@@ -17,12 +17,13 @@ class ImportJobStatus(object):
 class ImportMethod(object):
     APPEND_TIMESTAMP = "Append timestamp to tasklist name"
     USE_OWN_SUFFIX = "Append own suffix"
+    IMPORT_AS_IS = "Import tasklists, original names"
     ADD_TO_EXISTING_TASKLIST = "Add tasks to existing tasklists"
     REPLACE_TASKLIST_CONTENT = "Replace tasklist contents"
     SKIP_DUPLICATE_TASKLIST = "Skip duplicate tasklists"
     DELETE_BEFORE_IMPORT = "Delete all tasklists before import"
     
-    ALL_VALUES = [APPEND_TIMESTAMP, USE_OWN_SUFFIX, ADD_TO_EXISTING_TASKLIST, REPLACE_TASKLIST_CONTENT, SKIP_DUPLICATE_TASKLIST, DELETE_BEFORE_IMPORT]
+    ALL_VALUES = [APPEND_TIMESTAMP, USE_OWN_SUFFIX, IMPORT_AS_IS, ADD_TO_EXISTING_TASKLIST, REPLACE_TASKLIST_CONTENT, SKIP_DUPLICATE_TASKLIST, DELETE_BEFORE_IMPORT]
     
     # These methods require the tasklist suffix value to be appended to new tasklist names
     USE_SUFFIX_VALUES = [APPEND_TIMESTAMP, USE_OWN_SUFFIX]
@@ -31,7 +32,7 @@ class ImportMethod(object):
     RETRIEVE_EXISTING_TASKLISTS_VALUES = [ADD_TO_EXISTING_TASKLIST, REPLACE_TASKLIST_CONTENT, SKIP_DUPLICATE_TASKLIST]
     
     # Any of these methods require a new tasklist to be created
-    CREATE_NEW_TASKLIST_VALUES = [APPEND_TIMESTAMP, USE_OWN_SUFFIX, REPLACE_TASKLIST_CONTENT, DELETE_BEFORE_IMPORT, SKIP_DUPLICATE_TASKLIST]
+    CREATE_NEW_TASKLIST_VALUES = [APPEND_TIMESTAMP, USE_OWN_SUFFIX, IMPORT_AS_IS, REPLACE_TASKLIST_CONTENT, DELETE_BEFORE_IMPORT, SKIP_DUPLICATE_TASKLIST]
     
 class PauseReason(object):
     NONE = ''
