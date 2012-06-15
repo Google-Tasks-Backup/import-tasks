@@ -112,8 +112,7 @@ def send_job_to_worker(self, process_tasks_job):
         # Add the request to the tasks queue, passing in the user's email so that the task can access the database record
         q = taskqueue.Queue(settings.PROCESS_TASKS_REQUEST_QUEUE_NAME)
         t = taskqueue.Task(url=settings.WORKER_URL, params={settings.TASKS_QUEUE_KEY_NAME : user_email}, method='POST')
-        logging.debug(fn_name + "Adding task to " + str(settings.PROCESS_TASKS_REQUEST_QUEUE_NAME) + 
-            " queue, for " + str(user_email))
+        logging.debug(fn_name + "Adding task to %s queue, for %s" % (settings.PROCESS_TASKS_REQUEST_QUEUE_NAME, user_email))
         logservice.flush()
         
         try:
@@ -393,20 +392,11 @@ def get_credentials(self):
                     credentials = None
                     result = False
                         
-                    # retry_count = retry_count - 1
-                    # if retry_count > 0:
-                        # logging.debug(fn_name + "Error checking that credentials are valid, " + 
-                            # str(retry_count) + " retries remaining: " + get_exception_msg(e))
-                    # else:
-                        # logging.exception(fn_name + "Still errors checking that credentials are valid, even after " +
-                            # str(settings.NUM_API_TRIES) + " retries")
-                        # credentials = None
-                        # result = False
         else:
             # No credentials
             fail_msg = "No credentials"
             fail_reason = "Unable to retrieve credentials for user"
-            logging.debug(fn_name + fail_msg)
+            # logging.debug(fn_name + fail_msg)
             result = False
        
         if result:
@@ -525,7 +515,7 @@ def delete_blobstore(blob_info):
             logging.debug(fn_name + "Blobstore deleted")
             logservice.flush()
         except Exception, e:
-            logging.exception(fn_name + "Exception deleting " + file_name + ", key = " + blob_key)
+            logging.exception(fn_name + "Exception deleting %s, key = %s" % (blob_info.filename, blob_info.key()))
             logservice.flush()
     else:
         logging.warning(fn_name + "No blobstore to delete")

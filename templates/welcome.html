@@ -16,9 +16,12 @@ limitations under the License.
 
 This is the Django template for the landing page.
 {% endcomment %}
-<!doctype html>
-<html>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
     <head>
+        <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
         <title>{{ app_title }}</title>
         <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css" />
         <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
@@ -71,7 +74,8 @@ This is the Django template for the landing page.
 {% endif %}
 
     <h2>{{ app_title }}</h2>
-  
+    
+    
     <noscript>
         <br />
         <h3>Javascript must be enabled to use this site</h3>
@@ -288,30 +292,13 @@ This is the Django template for the landing page.
     </div>        
         
     <div class="small-break">
-        {{ app_title }} can import tasks from 2 different <a href="http://{{ url_GTB }}">Google Tasks Backup</a> formats; <span class="take-note">Import/Export GTBak</span> and <span class="take-note">Import/Export CSV</span>. 
+        {{ app_title }} can import tasks from 2 different <a href="http://{{ url_GTB }}">Google Tasks Backup</a> formats; 
+        <span class="take-note">Import/Export GTBak</span> and <span class="take-note">Import/Export CSV</span>. 
+        The <span class="take-note">GTBak format is recommened</span>, especially if your tasks contain international or extended characters. 
     </div>
     <div class="break comment">
         Google Tasks Backup can export tasks in several formats, but only the Import/Export CSV and GTBak formats can be imported using this application.
     </div>
-    <div class="break">
-        The <span class="take-note">GTBak format is recommened</span>, especially if your tasks contain international or extended characters. 
-    </div>
-    <div class="break">
-        For details of the CSV import file format, refer to the <a href="/static/info.html#import_export_description">information page</a>.
-        The CSV format does not support all international or extended characters, but may be edited by a text editor such as
-        <a href="http://notepad-plus-plus.org/">Notepad++</a> before being imported. It is not recommended to edit the CSV file with a spreadsheet program, as programs such as Excel and OpenOffice Calc tend to corrupt the data.
-    </div>
-    <div class="break">
-        
-    </div>
-    
-    <div class="break">
-    </div>
-    <div class="break comment">
-        Note that {{ app_title }} does not (yet) support import from Outlook CSV files. 
-        Support for Outlook CSV may be added if sufficient people request it at <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a>
-    </div>
-    
     {% if is_authorized %}
         <button id="start_button" class="big-button" type="button" onclick="start();">Start</button>
     {% else %}
@@ -329,6 +316,22 @@ This is the Django template for the landing page.
     </div>
    
 
+    <div class="break">
+        For details of the CSV import file format, refer to the <a href="/static/info.html#import_export_description">information page</a>.
+        The CSV format does not support all international or extended characters, but may be edited by a text editor such as
+        <a href="http://notepad-plus-plus.org/">Notepad++</a> before being imported. It is not recommended to edit the CSV file with a spreadsheet program, as programs such as Excel and OpenOffice Calc tend to corrupt the data.
+    </div>
+    <div class="break">
+        
+    </div>
+    
+    <div class="break">
+    </div>
+    <div class="break comment">
+        Note that {{ app_title }} does not (yet) support import from Outlook CSV files. 
+        Support for Outlook CSV may be added if sufficient people request it at <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a>
+    </div>
+    
 	<div class="project-footer">
         <div class="break">
             Version {{ app_version }} ({{ upload_timestamp }})

@@ -16,9 +16,12 @@ limitations under the License.
 
 This is the Django template for the landing page.
 {% endcomment %}
-<!doctype html>
-<html>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
     <head>
+        <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
         <title>{{ app_title }}</title>
         <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css" />
         <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
@@ -31,13 +34,9 @@ This is the Django template for the landing page.
                 if (t) {
                     $('#import_new').fadeOut("fast");
                     $('#import_existing').fadeIn("fast");
-                    //document.getElementById('import_new').style.display = 'none';
-                    //document.getElementById('import_existing').style.display = '';
                 } else {
                     $('#import_existing').fadeOut("fast");
                     $('#import_new').fadeIn("fast");
-                    //document.getElementById('import_new').style.display = '';
-                    //document.getElementById('import_existing').style.display = 'none';
                 }
             }
 
@@ -161,10 +160,12 @@ This is the Django template for the landing page.
         </div>
     {% endif %}
 
+     
     <div {% if found_paused_job %}class="no-display"{% endif %} id="import_new">
         <form 
             id="selectFileForm" 
             action="/dummy" 
+            accept-charset="UTF-8"
             method="POST"
             enctype="multipart/form-data">
             
@@ -211,9 +212,13 @@ This is the Django template for the landing page.
                         <td>
                             Append your own suffix <input id="user_suffix" name="user_suffix" type="text" onfocus="javascript:document.getElementById('use_own_suffix').checked=true;" />
                             <img class="popupTrigger" id="help-USE_OWN_SUFFIX" src="/static/help.png" alt="Display help">
+                            <img class="popupTrigger" id="help-USE_OWN_SUFFIX" src="/static/warning.png" alt="Display warning">
                             <div class="popupContent" id="help-USE_OWN_SUFFIX-content">
                                 <img class="popupClose" src="/static/close.png" alt="Close">
                                 <div class="clear">
+                                    <span style="color:red;">WARNING:</span> Extended or international characters are NOT supported when appending to a tasklist name. Only 'normal' un-accented characters may be used.
+                                </div>
+                                <div class="medium-break">
                                     For each tasklist in the imported data, create a new tasklist (with the suffix)
                                     containing only the imported tasks for that tasklist.
                                 </div>

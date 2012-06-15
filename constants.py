@@ -17,7 +17,7 @@ class ImportJobStatus(object):
 class ImportMethod(object):
     APPEND_TIMESTAMP = "Append timestamp to tasklist name"
     USE_OWN_SUFFIX = "Append own suffix"
-    IMPORT_AS_IS = "Import tasklists, original names"
+    IMPORT_AS_IS = "Import tasklists, original tasklist names"
     ADD_TO_EXISTING_TASKLIST = "Add tasks to existing tasklists"
     REPLACE_TASKLIST_CONTENT = "Replace tasklist contents"
     SKIP_DUPLICATE_TASKLIST = "Skip duplicate tasklists"

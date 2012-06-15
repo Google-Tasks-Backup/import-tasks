@@ -1,3 +1,6 @@
+#!/usr/bin/python2.7
+# -*- coding: iso-8859-1 -*-
+
 import logging
 import os
 import pickle
@@ -43,7 +46,8 @@ import datetime
 from datetime import timedelta
 import time
 import math
-import csv
+# import csv
+import unicodecsv # Used instead of csv, supports unicode
 
 import model
 import settings
@@ -72,21 +76,30 @@ class ImportJobState(object):
     num_of_imported_tasks = 0
     num_tasklists = 0    
 
+def _safe_str(str):
+    if str:
+        return str
+    else:
+        return ''
     
 def _log_job_state(import_job_state):
     # DEBUG: TODO: Only log job state for test users
-    logging.debug("Job state:" +
-        "\n    prev_tasklist_ids = " + str(import_job_state.prev_tasklist_ids) +
-        "\n    parents_ids = " + str(import_job_state.parents_ids) +
-        "\n    sibling_ids = " + str(import_job_state.sibling_ids) +
-        "\n    prev_tasklist_name = '" + str(import_job_state.prev_tasklist_name) +
-        "'\n    prev_depth = " + str(import_job_state.prev_depth) +
-        "\n    sibling_id = " + str(import_job_state.sibling_id) +
-        "\n    parent_id = " + str(import_job_state.parent_id) +
-        "\n    tasklist_id = " + str(import_job_state.tasklist_id) +
-        "\n    data_row_num = " + str(import_job_state.data_row_num) +
-        "\n    num_of_imported_tasks = " + str(import_job_state.num_of_imported_tasks) +
-        "\n    num_tasklists = " + str(import_job_state.num_tasklists))
+    
+    if import_job_state:
+        logging.debug("Job state:" +
+            "\n    prev_tasklist_ids = " + str(import_job_state.prev_tasklist_ids) +
+            "\n    parents_ids = " + str(import_job_state.parents_ids) +
+            "\n    sibling_ids = " + str(import_job_state.sibling_ids) +
+            "\n    prev_tasklist_name = '" + _safe_str(import_job_state.prev_tasklist_name) +
+            "'\n    prev_depth = " + str(import_job_state.prev_depth) +
+            "\n    sibling_id = " + str(import_job_state.sibling_id) +
+            "\n    parent_id = " + str(import_job_state.parent_id) +
+            "\n    tasklist_id = " + str(import_job_state.tasklist_id) +
+            "\n    data_row_num = " + str(import_job_state.data_row_num) +
+            "\n    num_of_imported_tasks = " + str(import_job_state.num_of_imported_tasks) +
+            "\n    num_tasklists = " + str(import_job_state.num_tasklists))
+    else:
+        logging.debug("Job state not (yet) set")
     logservice.flush()
     
     
@@ -135,7 +148,7 @@ class ProcessTasksWorker(webapp.RequestHandler):
                     return
                     # TODO: Find some way of notifying the user?????
                 else:
-                    logging.debug(fn_name + "Retrieved process tasks job for " + str(self.user_email))
+                    logging.debug(fn_name + "Retrieved process tasks job for " + self.user_email)
                     logservice.flush()
 
                     if self.process_tasks_job.status in constants.ImportJobStatus.STOPPED_VALUES:
@@ -157,7 +170,7 @@ class ProcessTasksWorker(webapp.RequestHandler):
                     user = self.process_tasks_job.user
                     
                     if not user:
-                        logging.error(fn_name + "No user object in DB record for " + str(self.user_email))
+                        logging.error(fn_name + "No user object in DB record for " + self.user_email)
                         logservice.flush()
                         self._report_error("Problem with user details. Please restart.")
                         logging.debug(fn_name + "<End> No user object")
@@ -168,14 +181,14 @@ class ProcessTasksWorker(webapp.RequestHandler):
                         model.Credentials, user.user_id(), "credentials").get()
                         
                     if not self.credentials:
-                        logging.error(fn_name + "No credentials in DB record for " + str(self.user_email))
+                        logging.error(fn_name + "No credentials in DB record for " + self.user_email)
                         logservice.flush()
                         self._report_error("Problem with credentials. Please restart and re-authenticate.")
                         logging.debug(fn_name + "<End> No self.credentials")
                         return
                   
                     if self.credentials.invalid:
-                        logging.error(fn_name + "Invalid credentials in DB record for " + str(self.user_email))
+                        logging.error(fn_name + "Invalid credentials in DB record for " + self.user_email)
                         logservice.flush()
                         self._report_error("Invalid credentials. Please restart and re-authenticate.")
                         logging.debug(fn_name + "<End> Invalid self.credentials")
@@ -185,21 +198,28 @@ class ProcessTasksWorker(webapp.RequestHandler):
                         logging.debug(fn_name + "User is test user %s" % self.user_email)
                         logservice.flush()
                     
-                    try:
-                        # ---------------------------------------------------------
-                        #       Connect to the tasks and tasklists services
-                        # ---------------------------------------------------------
-                        http = httplib2.Http()
-                        http = self.credentials.authorize(http)
-                        service = discovery.build("tasks", "v1", http)
-                        self.tasklists_svc = service.tasklists()
-                        self.tasks_svc = service.tasks()
-                
-                    except apiclient_errors.HttpError, e:
-                        self._handle_http_error(e, retry_count, "Error connecting to Tasks services")
-                        
-                    except Exception, e:
-                        self._handle_general_error(e, retry_count, "Error connecting to Tasks services")
+                    retry_count = settings.NUM_API_TRIES
+                    while retry_count > 0:
+                        retry_count = retry_count - 1
+                        # Accessing tasklists & tasks services may take some time (especially if retries due to DeadlineExceeded),
+                        # so update progress so that job doesn't stall
+                        self._update_progress()
+                        try:
+                            # ---------------------------------------------------------
+                            #       Connect to the tasks and tasklists services
+                            # ---------------------------------------------------------
+                            http = httplib2.Http()
+                            http = self.credentials.authorize(http)
+                            service = discovery.build("tasks", "v1", http)
+                            self.tasklists_svc = service.tasklists()
+                            self.tasks_svc = service.tasks()
+                            break # Success
+                    
+                        except apiclient_errors.HttpError, e:
+                            self._handle_http_error(fn_name, e, retry_count, "Error connecting to Tasks services")
+                            
+                        except Exception, e:
+                            self._handle_general_error(fn_name, e, retry_count, "Error connecting to Tasks services")
                     
                     # ===================================
                     #           Import tasks
@@ -223,7 +243,7 @@ class ProcessTasksWorker(webapp.RequestHandler):
             self.process_tasks_job.message = "Processed " + str(self.import_job_state.data_row_num) + " of " + \
                 str(self.process_tasks_job.total_num_rows_to_process) + " data rows."
             # self.process_tasks_job.error_message = "Daily limit exceeded. Please try again after midnight Pacific Standard Time."
-            logging.warning(fn_name + "Paused import job; daily limit exceeded.")
+            logging.info(fn_name + "Paused import job; daily limit exceeded.")
             logservice.flush()
             self._log_job_progress()
             _log_job_state(self.import_job_state) # Log job state info
@@ -235,7 +255,7 @@ class ProcessTasksWorker(webapp.RequestHandler):
             self._report_error("System Error: " + shared.get_exception_msg(e))
             
 
-        logging.debug(fn_name + "<End>, user = " + str(self.user_email))
+        logging.debug(fn_name + "<End>, user = " + self.user_email)
         logservice.flush()
 
 
@@ -287,7 +307,7 @@ class ProcessTasksWorker(webapp.RequestHandler):
             # file_name = str(self.blob_info.filename)
             # logging.debug(fn_name + "Filename = " + file_name + ", key = " + str(blob_key))
             # logservice.flush()
-            logging.debug(fn_name + "Filetype: '" + str(self.process_tasks_job.file_type) + "'")
+            logging.debug(fn_name + "Filetype: '" + self.process_tasks_job.file_type + "'")
             logservice.flush()
             if self.process_tasks_job.file_type == 'gtbak': 
                 # Data file contains two pickled values; file_format_version & tasks_data
@@ -296,14 +316,14 @@ class ProcessTasksWorker(webapp.RequestHandler):
                 file_format_version = pickle.load(blob_reader) 
                 tasks_data = pickle.load(blob_reader)
             else:
-                tasks_data=csv.DictReader(blob_reader,dialect='excel')
+                tasks_data=unicodecsv.DictReader(blob_reader,dialect='excel')
             
             import_method = self.process_tasks_job.import_method
             
             if import_method in constants.ImportMethod.USE_SUFFIX_VALUES:
                 # Use the suffix which was set when the import job was created
                 # This is either the datetime, or the suffix entered by the user (from the webpage)
-                tasklist_suffix = str(self.process_tasks_job.import_tasklist_suffix).rstrip()
+                tasklist_suffix = self.process_tasks_job.import_tasklist_suffix
             else:
                 tasklist_suffix = ''
                 
@@ -406,7 +426,7 @@ class ProcessTasksWorker(webapp.RequestHandler):
                         depth = int(task_row_data['depth'])
                     except Exception, e:
                         err_msg = "Invalid depth value [" + str(task_row_data['depth']) + "] for data row " + \
-                            str(self.import_job_state.data_row_num) + ", Exception: " + str(e)
+                            str(self.import_job_state.data_row_num) + ", Exception: " + shared.get_exception_msg(e)
                     # 'depth' is not part of the Tasks resource, so delete it from the dictionary
                     del(task_row_data['depth'])
                 else:
@@ -462,14 +482,29 @@ class ProcessTasksWorker(webapp.RequestHandler):
                         #       Create new tasklist
                         # ----------------------------------
                         tasklist = { 'title': tasklist_name + tasklist_suffix }
-                        # TODO: try-except
-                        result = self.tasklists_svc.insert(body=tasklist).execute()
-                        # TODO: Catch HTTP error & check & Raise DailyLimitExceededError() and catch at top level?
-                        self.import_job_state.tasklist_id = result['id']
-                        self.import_job_state.prev_tasklist_ids[tasklist_name] = self.import_job_state.tasklist_id
-                        if self.is_test_user:
-                            logging.debug(fn_name + "Created new Tasklist [" + tasklist['title'] + "], ID = " + self.import_job_state.tasklist_id)
-                            logservice.flush()
+                        
+                        retry_count = settings.NUM_API_TRIES
+                        while retry_count > 0:
+                            retry_count = retry_count - 1
+                            # Creating tasklists may take some time (especially if retries due to DeadlineExceeded,
+                            # so update progress so that job doesn't stall
+                            self._update_progress()
+                            try:
+                                result = self.tasklists_svc.insert(body=tasklist).execute()
+                                # TODO: Catch HTTP error & check & Raise DailyLimitExceededError() and catch at top level?
+                                self.import_job_state.tasklist_id = result['id']
+                                self.import_job_state.prev_tasklist_ids[tasklist_name] = self.import_job_state.tasklist_id
+                                if self.is_test_user:
+                                    logging.debug(fn_name + "Created new Tasklist [" + tasklist['title'] + "], ID = " + self.import_job_state.tasklist_id)
+                                    logservice.flush()
+                                break # Success
+                                    
+                            except apiclient_errors.HttpError, e:
+                                self._handle_http_error(fn_name, e, retry_count, "Error creating new tasklist")
+                                
+                            except Exception, e:
+                                # DEBUG: TODO: Only log tasklist_name & ID for test users
+                                self._handle_general_error(fn_name, e, retry_count, "Error creating new tasklist")
                             
                             
                     # Importing into a new list, or new tasks into an existing list, so start with no parents or siblings
@@ -629,10 +664,9 @@ class ProcessTasksWorker(webapp.RequestHandler):
                                 "\n    parent = " + str(parent_id) +
                                 "\n    previous = " + str(self.import_job_state.sibling_id) +
                                 "\n    Data row num = " + str(self.import_job_state.data_row_num) +
-                                "\n    Depth = " + str(depth) +
-                                "\n    body = " + str(task_row_data))
+                                "\n    Depth = " + str(depth))
                             logservice.flush()
-                        self._handle_http_error(e, retry_count, "Error creating task from data row " + str(self.import_job_state.data_row_num))
+                        self._handle_http_error(fn_name, e, retry_count, "Error creating task from data row " + str(self.import_job_state.data_row_num))
                         
                     except Exception, e:
                         if retry_count == 0:    
@@ -642,10 +676,9 @@ class ProcessTasksWorker(webapp.RequestHandler):
                                 "\n    parent = " + str(parent_id) +
                                 "\n    previous = " + str(self.import_job_state.sibling_id) +
                                 "\n    Task num = " + str(self.import_job_state.data_row_num) +
-                                "\n    Depth = " + str(depth) +
-                                "\n    body = " + str(task_row_data))
+                                "\n    Depth = " + str(depth))
                             logservice.flush()
-                        self._handle_general_error(e, retry_count, "Error creating task from data row " + str(self.import_job_state.data_row_num))
+                        self._handle_general_error(fn_name, e, retry_count, "Error creating task from data row " + str(self.import_job_state.data_row_num))
 
                             
                     if retry_count <= 2:
@@ -706,7 +739,7 @@ class ProcessTasksWorker(webapp.RequestHandler):
                     q = taskqueue.Queue(settings.PROCESS_TASKS_REQUEST_QUEUE_NAME)
                     t = taskqueue.Task(url=settings.WORKER_URL, params={settings.TASKS_QUEUE_KEY_NAME : self.user_email}, method='POST')
                     logging.debug(fn_name + "Continue import in another job. Adding task to " + str(settings.PROCESS_TASKS_REQUEST_QUEUE_NAME) + 
-                        " queue, for " + str(self.user_email))
+                        " queue, for " + self.user_email)
                     
                     try:
                         q.add(t)
@@ -745,11 +778,11 @@ class ProcessTasksWorker(webapp.RequestHandler):
             self.process_tasks_job.job_progress_timestamp = datetime.datetime.now()
             self._log_job_progress()
             self.process_tasks_job.put()
-            # logging.debug(fn_name + "Marked import job complete for " + str(self.user_email) + ", with progress = " + 
-                # str(self.process_tasks_job.total_progress) + " " + str(self.process_tasks_job.message))
+            # logging.debug(fn_name + "Marked import job complete for " + self.user_email + ", with progress = " + 
+                # str(self.process_tasks_job.total_progress) + " " + self.process_tasks_job.message)
             logservice.flush()
         
-            logging.info(fn_name + "COMPLETED: Imported " + str(self.import_job_state.num_of_imported_tasks) + " tasks for " + str(self.user_email) +
+            logging.info(fn_name + "COMPLETED: Imported " + str(self.import_job_state.num_of_imported_tasks) + " tasks for " + self.user_email +
                 ", from " + str(self.import_job_state.data_row_num) + 
                 " data rows into " + str(self.import_job_state.num_tasklists) + " tasklists, in " + proc_time_str)
             
@@ -812,10 +845,10 @@ class ProcessTasksWorker(webapp.RequestHandler):
                     break
                 
                 except apiclient_errors.HttpError, e:
-                    self._handle_http_error(e, retry_count, "Error retrieving list of tasklists")
+                    self._handle_http_error(fn_name, e, retry_count, "Error retrieving list of tasklists")
                     
                 except Exception, e:
-                    self._handle_general_error(e, retry_count, "Error retrieving list of tasklists")
+                    self._handle_general_error(fn_name, e, retry_count, "Error retrieving list of tasklists")
         
             if self.is_test_user and settings.DUMP_DATA:
                 logging.debug(fn_name + "tasklists_data ==>")
@@ -892,7 +925,7 @@ class ProcessTasksWorker(webapp.RequestHandler):
         return tasklists
 
         
-    def _delete_tasklist_by_id(self, tasklist_id, tasklist_name = None):
+    def _delete_tasklist_by_id(self, tasklist_id, tasklist_name = ''):
         """ Delete specified tasklist.
         
             If tasklist_id is the default tasklist, rename it (because default list cannot be deleted).
@@ -901,12 +934,23 @@ class ProcessTasksWorker(webapp.RequestHandler):
         """
         fn_name = "_delete_tasklist_by_id(): "
         
+        retry_count = settings.NUM_API_TRIES
         if not self.default_tasklist_id:
-            # TODO: try-except around .get()
-            # Get the ID of the default tasklist
-            default_tasklist = self.tasklists_svc.get(tasklist='@default').execute()
-            self.default_tasklist_id = default_tasklist['id']
-            # TODO: Catch HTTP error & check & Raise DailyLimitExceededError() and catch at top level?
+            while retry_count > 0:
+                retry_count = retry_count - 1
+                try:
+                    # Get the ID of the default tasklist
+                    default_tasklist = self.tasklists_svc.get(tasklist='@default').execute()
+                    self.default_tasklist_id = default_tasklist['id']
+                    break # Success
+
+                except apiclient_errors.HttpError, e:
+                    self._handle_http_error(fn_name, e, retry_count, "Error retrieving default tasklist ID")
+                    
+                except Exception, e:
+                    # DEBUG: TODO: Only log tasklist_name & ID for test users
+                    self._handle_general_error(fn_name, e, retry_count, "Error retrieving default tasklist ID")
+                        
 
         retry_count = settings.NUM_API_TRIES
         while retry_count > 0:
@@ -925,7 +969,7 @@ class ProcessTasksWorker(webapp.RequestHandler):
                     # Use Unix timestamp to create a unique title for the undeletable default tasklist
                     default_tasklist['title'] = 'Undeletable default ' + str(int(time.mktime(datetime.datetime.now().timetuple())))
                     result = self.tasklists_svc.update(tasklist=self.default_tasklist_id, body=default_tasklist).execute()
-                    logging.debug(fn_name + "Renamed default tasklist '" + str(tasklist_name) + "' to '" + str(default_tasklist['title']))
+                    logging.debug(fn_name + "Renamed default tasklist")
                     logservice.flush()
                     #logging.debug(result)
                 else:
@@ -935,17 +979,17 @@ class ProcessTasksWorker(webapp.RequestHandler):
                     action_str = "deleting"
                     self.tasklists_svc.delete(tasklist=tasklist_id).execute()
                     # DEBUG: TODO: Only log tasklist_name & ID for test users
-                    logging.debug(fn_name + "Deleted tasklist '" + str(tasklist_name) + "', id = " + str(tasklist_id))
+                    logging.debug(fn_name + "Deleted tasklist, id = " + str(tasklist_id))
                     logservice.flush()
-                break
+                break # Success
                 
             except apiclient_errors.HttpError, e:
                 # DEBUG: TODO: Only log tasklist_name & ID for test users
-                self._handle_http_error(e, retry_count, "Error " + action_str + " tasklist '" + str(tasklist_name) + "', id = " + str(tasklist_id))
+                self._handle_http_error(fn_name, e, retry_count, "Error " + action_str + " tasklist, id = " + str(tasklist_id))
                 
             except Exception, e:
                 # DEBUG: TODO: Only log tasklist_name & ID for test users
-                self._handle_general_error(e, retry_count, "Error " + action_str + " tasklist '" + str(tasklist_name) + "', id = " + str(tasklist_id))
+                self._handle_general_error(fn_name, e, retry_count, "Error " + action_str + " tasklist, id = " + str(tasklist_id))
                     
                     
     def _delete_tasklists(self, tasklists):
@@ -993,40 +1037,42 @@ class ProcessTasksWorker(webapp.RequestHandler):
         self.process_tasks_job.message = ''
         self.process_tasks_job.error_message = err_msg
         self.process_tasks_job.job_progress_timestamp = datetime.datetime.now()
-        # Current data row was NOT processed, so change data_row_num so it now refers to last successfully imported row
-        # data_row_num is incremented at the start of the task processing loop
+        
+        # import_job_state may be None, depending on when the error occurs, so only access the variable if it has a value
         if self.import_job_state:
+            # Current data row was NOT processed, so change data_row_num so it now refers to last successfully imported row
+            # data_row_num is incremented at the start of the task processing loop
             self.import_job_state.data_row_num = self.import_job_state.data_row_num - 1
-        self.process_tasks_job.pickled_import_state = pickle.dumps(self.import_job_state)
-        self.process_tasks_job.total_progress = self.import_job_state.num_of_imported_tasks
-        self._log_job_progress()
+            self.process_tasks_job.total_progress = self.import_job_state.num_of_imported_tasks
         _log_job_state(self.import_job_state) # Log job state info
+        self.process_tasks_job.pickled_import_state = pickle.dumps(self.import_job_state)
+        self._log_job_progress()
         self.process_tasks_job.put()
         # Import process terminated, so delete the blobstore
         shared.delete_blobstore(self.blob_info)
 
 
-    def _handle_http_error(self, e, retry_count, err_msg):
+    def _handle_http_error(self, fn_name, e, retry_count, err_msg):
         if e._get_reason().lower() == "daily limit exceeded":
-            logging.warning("HttpError: " + err_msg + ": " + shared.get_exception_msg(e))
+            logging.info(fn_name + "HttpError: " + err_msg + ": " + shared.get_exception_msg(e))
             logservice.flush()
             raise DailyLimitExceededError()
         if retry_count > 0:
-            logging.warning("HttpError: " + err_msg + ", " + str(retry_count) + " retries remaining: " + shared.get_exception_msg(e))
+            logging.info(fn_name + "HttpError: " + err_msg + ", " + str(retry_count) + " retries remaining: " + shared.get_exception_msg(e))
             logservice.flush()
         else:
-            logging.exception("HttpError: " + err_msg + ". Giving up after " + str(settings.NUM_API_TRIES) + " retries")
+            logging.exception(fn_name + "HttpError: " + err_msg + ". Giving up after " + str(settings.NUM_API_TRIES) + " retries")
             logservice.flush()
             self._report_error(err_msg)
             raise e
 
 
-    def _handle_general_error(self, e, retry_count, err_msg):
+    def _handle_general_error(self, fn_name, e, retry_count, err_msg):
         if retry_count > 0:
-            logging.warning("Error: " + err_msg + ", " + str(retry_count) + " retries remaining: " + shared.get_exception_msg(e))
+            logging.info(fn_name + "Error: " + err_msg + ", " + str(retry_count) + " retries remaining: " + shared.get_exception_msg(e))
             logservice.flush()
         else:
-            logging.exception("Error: " + err_msg + ". Giving up after " + str(settings.NUM_API_TRIES) + " retries")
+            logging.exception(fn_name + "Error: " + err_msg + ". Giving up after " + str(settings.NUM_API_TRIES) + " retries")
             logservice.flush()
             self._report_error(err_msg)
             raise e
@@ -1038,7 +1084,8 @@ class ProcessTasksWorker(webapp.RequestHandler):
             if msg:
                 self.process_tasks_job.message = msg
             self.process_tasks_job.job_progress_timestamp = datetime.datetime.now()
-            self.process_tasks_job.total_progress = self.import_job_state.num_of_imported_tasks
+            if self.import_job_state:
+                self.process_tasks_job.total_progress = self.import_job_state.num_of_imported_tasks
             self._log_job_progress()
             self.process_tasks_job.put()
             self.prev_progress_timestamp = datetime.datetime.now()
@@ -1048,10 +1095,10 @@ class ProcessTasksWorker(webapp.RequestHandler):
     def _log_job_progress(self):
         """ Write a debug message showing current progress """
         
-        msg1 = "Job status: '" + str(self.process_tasks_job.status) +"', progress: " + str(self.process_tasks_job.total_progress)
-        msg2 = ", msg: '" + str(self.process_tasks_job.message) + "'" if self.process_tasks_job.message else ''
-        msg3 = ", err msg: '" + str(self.process_tasks_job.error_message) + "'" if self.process_tasks_job.error_message else ''
-        msg4 = " (Paused: " + str(self.process_tasks_job.pause_reason) + ")" if self.process_tasks_job.is_paused else ''
+        msg1 = "Job status: '" + self.process_tasks_job.status +"', progress: " + str(self.process_tasks_job.total_progress)
+        msg2 = ", msg: '" + self.process_tasks_job.message + "'" if self.process_tasks_job.message else ''
+        msg3 = ", err msg: '" + self.process_tasks_job.error_message + "'" if self.process_tasks_job.error_message else ''
+        msg4 = " (Paused: " + self.process_tasks_job.pause_reason + ")" if self.process_tasks_job.is_paused else ''
         logging.debug(msg1 + msg2 + msg3 + msg4)
         logservice.flush()
     
