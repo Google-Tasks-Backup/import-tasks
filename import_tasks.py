@@ -188,8 +188,10 @@ class MainHandler(webapp.RequestHandler):
             job_status = None
             total_progress = 0
             total_num_rows_to_process = 0
+            remaining_tasks = 0
             import_in_progress = False
             found_paused_job = False
+            job_start_timestamp = ''
             if process_tasks_job:
                 job_status = process_tasks_job.status
                 logging.debug(fn_name + "Retrieved import tasks job for " + user_email + ", status = " + job_status)
@@ -206,6 +208,8 @@ class MainHandler(webapp.RequestHandler):
                     file_name = process_tasks_job.file_name
                     total_num_rows_to_process = process_tasks_job.total_num_rows_to_process
                     total_progress = process_tasks_job.total_progress
+                    remaining_tasks = total_num_rows_to_process - total_progress
+                    job_start_timestamp = process_tasks_job.job_start_timestamp
                     logging.debug(fn_name + "Found paused import job")
                     logservice.flush()
 
@@ -260,7 +264,9 @@ class MainHandler(webapp.RequestHandler):
                                'file_upload_time' : file_upload_time,
                                'total_num_rows_to_process' : total_num_rows_to_process,
                                'total_progress' : total_progress,
+                               'remaining_tasks' : remaining_tasks,
                                'file_name' : file_name,
+                               'job_start_timestamp' : job_start_timestamp,
                                'manage_blobstore_url' : settings.ADMIN_MANAGE_BLOBSTORE_URL,
                                'user_email' : user_email,
                                'msg': self.request.get('msg'),

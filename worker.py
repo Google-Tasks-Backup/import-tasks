@@ -657,6 +657,23 @@ class ProcessTasksWorker(webapp.RequestHandler):
                         break
                     
                     except apiclient_errors.HttpError, e:
+                        # TODO: Handle "Not Found" error. 
+                        # See;
+                        #  http://code.google.com/p/import-tasks/issues/detail?id=1
+                        #  BUG 2012-05-08 01:02
+                        #       This happens very occassionaly, where the API returns "Not Found" when attempting to
+                        #       add a task with the ID of a previously added task as 'previous'
+                        #   When task is created, store (in import_job_state by depth, in addition to sibling_ids);
+                        #       Task name
+                        #       Row number
+                        #   This allows reporting of which task was NOT created!
+                        # OR
+                        #   If we store previous-previous ID (at each depth), and the whole task{}, we could re-create the missing task
+                        # OR
+                        #   If we store last 2 task IDs (at each depth), we could use the previous-previous if previous fails
+                        #       This allows us to at least continue to add in the correct order
+                        #       (Adding without previous ID inserts tasks at start of tasklist)
+                    
                         if retry_count == 0:    
                             # DEBUG
                             logging.debug(fn_name + "Failed task:" +

@@ -86,6 +86,11 @@ label.choose_display_format {
   display: block;
 } 
 
+.input_no_wrap { 
+  float: left;
+  display: block;
+} 
+
 .no-display {
     display: none;
 }

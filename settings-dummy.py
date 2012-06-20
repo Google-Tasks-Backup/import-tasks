@@ -60,53 +60,78 @@ url_issues_page = "code.google.com/p/import-tasks/issues/list"
 
 url_source_code = "code.google.com/p/import-tasks/source/browse/"
 
-# Must match name in queue.yaml
-BACKUP_REQUEST_QUEUE_NAME = 'import-tasks-request'
+# URL to direct people to if they wish to backup their tasks
+url_GTB = "tasks-backup.appspot.com"
 
+# Must match name in queue.yaml
+PROCESS_TASKS_REQUEST_QUEUE_NAME = 'import-tasks-request'
+
+# The string used used with the params dictionary argument to the taskqueue, 
+# used as the key to retrieve the value from the task queue
 TASKS_QUEUE_KEY_NAME = 'user_email'
 
-MAIN_PAGE_URL = '/'
+WELCOME_PAGE_URL = '/'
 
-START_BACKUP_URL = '/startbackup'
+MAIN_PAGE_URL = '/main'
 
 PROGRESS_URL = '/progress'
 
-RESULTS_URL = '/results'
-
 INVALID_CREDENTIALS_URL = '/invalidcredentials'
 
-DB_KEY_TASKS_DATA = 'tasks_data'
+GET_NEW_BLOBSTORE_URL = '/getnewblobstoreurl'
 
-# Max blob size is just under 1MB (~2^20), so use 1000000 to allow some margin for overheads
-MAX_BLOB_SIZE = 1000000
+BLOBSTORE_UPLOAD_URL = '/fileupload'
 
-# Maximum number of seconds allowed between the start of a job, and when we give up.
-# i.e., display error message and stop refreshing progress.html
-MAX_JOB_TIME =  650
+CONTINUE_IMPORT_JOB_URL = '/continue'
 
-# If the user has more than this number of tasks, display a warning message that
-# displaying as an HTML page may fail
-LARGE_LIST_HTML_WARNING_LIMIT = 6000
+ADMIN_MANAGE_BLOBSTORE_URL = '/admin/blobstore/manage'
+
+ADMIN_DELETE_BLOBSTORE_URL = '/admin/blobstore/delete'
+
+ADMIN_BULK_DELETE_BLOBSTORE_URL = '/admin/blobstore/bulkdelete'
+
+WORKER_URL = '/worker'
+
+# Maximum number of consecutive authorisation requests
+# Redirect user to Invalid Credentials page if there are more than this number of tries
+MAX_NUM_AUTH_RETRIES = 3
+
+# Number of times to try server actions
+# Exceptions are usually due to DeadlineExceededError on individual API calls
+# The first (NUM_API_TRIES - 2) retries are immediate. The app sleeps for 
+# API_RETRY_SLEEP_DURATION seconds before trying the 2nd last and last retries.
+NUM_API_TRIES = 4
+
+# Number of seconds to sleep for the last 2 API retries
+API_RETRY_SLEEP_DURATION = 45
+
+# If the import hasn't finished within MAX_WORKER_RUN_TIME seconds, we stop the current import run, and then
+# add the job to the taskqueue to continue the import process in a new worker.
+# We allow 8 minutes (480 seconds), to allow for 2 x API_RETRY_SLEEP_DURATION second retries on DeadlineExceededError, 
+# and to give some margin, from the maximum allowed 10 minutes.
+#MAX_WORKER_RUN_TIME = 480
+MAX_WORKER_RUN_TIME = 600 - 2 * API_RETRY_SLEEP_DURATION - 30
+#MAX_WORKER_RUN_TIME = 20 # DEBUG
 
 # If the job hasn't been updated in MAX_JOB_PROGRESS_INTERVAL seconds, assume that the job has stalled, 
 # and display error message and stop refreshing progress.html
-MAX_JOB_PROGRESS_INTERVAL = 90
+# - Longest observed time between job added to taskqueue, and worker starting, is 89.5 seconds
+# - Max time between updates would be when API fails multiple times, when we sleep API_RETRY_SLEEP_DURATION seconds
+#   for the last 2 retries + 10 seconds per API access
+MAX_JOB_PROGRESS_INTERVAL = 2 * API_RETRY_SLEEP_DURATION + NUM_API_TRIES * 10 + 30
 
 # Update number of tasks in tasklist every TASK_COUNT_UPDATE_INTERVAL seconds
 # This prevents excessive Datastore Write Operations which can exceed quota
 TASK_COUNT_UPDATE_INTERVAL = 5
 
 # Refresh progress page every PROGRESS_PAGE_REFRESH_INTERVAL seconds
-PROGRESS_PAGE_REFRESH_INTERVAL = 8
-
-# Number of pixels for each depth level for sub-tasks
-# e.g., for a 3rd level subtask, indent would be 3 * TASK_INDENT
-TASK_INDENT = 40
+PROGRESS_PAGE_REFRESH_INTERVAL = 6
 
 
-# Maximum number of consecutive authorisation requests
-# Redirect user to Invalid Credentials page if there are more than this number of tries
-MAX_NUM_AUTH_REQUESTS = 4
+# Auth count cookie expires after 'n' seconds. 
+# That is, we count the number of authorisation attempts within 'n' seconds, and then we reset the count back to zero.
+# This prevents the total number of authorisations over a user session being counted (and hence max exceeded) if the user has a vey long session
+AUTH_RETRY_COUNT_COOKIE_EXPIRATION_TIME = 60
 
 # ###############################################
 #                  Debug settings

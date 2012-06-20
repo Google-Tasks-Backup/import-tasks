@@ -100,6 +100,12 @@ This is the Django template for the landing page.
         </div>
     {% endif %}
     
+    <div class="small-break">
+        {{ app_title }} can import tasks from 2 different <a href="http://{{ url_GTB }}">Google Tasks Backup</a> formats; 
+        <span class="take-note">Import/Export GTBak</span> and <span class="take-note">Import/Export CSV</span>. 
+        The <span class="take-note">GTBak format is recommened</span>, especially if your tasks contain international or extended characters. 
+    </div>
+    
     <div class="medium-break">
         There are several methods for importing tasks (chosen on next page);
     </div>
@@ -291,14 +297,6 @@ This is the Django template for the landing page.
         
     </div>        
         
-    <div class="small-break">
-        {{ app_title }} can import tasks from 2 different <a href="http://{{ url_GTB }}">Google Tasks Backup</a> formats; 
-        <span class="take-note">Import/Export GTBak</span> and <span class="take-note">Import/Export CSV</span>. 
-        The <span class="take-note">GTBak format is recommened</span>, especially if your tasks contain international or extended characters. 
-    </div>
-    <div class="break comment">
-        Google Tasks Backup can export tasks in several formats, but only the Import/Export CSV and GTBak formats can be imported using this application.
-    </div>
     {% if is_authorized %}
         <button id="start_button" class="big-button" type="button" onclick="start();">Start</button>
     {% else %}
@@ -318,14 +316,19 @@ This is the Django template for the landing page.
 
     <div class="break">
         For details of the CSV import file format, refer to the <a href="/static/info.html#import_export_description">information page</a>.
-        The CSV format does not support all international or extended characters, but may be edited by a text editor such as
-        <a href="http://notepad-plus-plus.org/">Notepad++</a> before being imported. It is not recommended to edit the CSV file with a spreadsheet program, as programs such as Excel and OpenOffice Calc tend to corrupt the data.
+        The CSV format may not support all international or extended characters, but may be edited by a text editor such as
+        <a href="http://notepad-plus-plus.org/">Notepad++</a> before being imported. 
+        It is not recommended to edit the CSV file with a spreadsheet program, as programs such as Excel and OpenOffice Calc tend to 
+        corrupt the data.
     </div>
     <div class="break">
         
     </div>
     
     <div class="break">
+    </div>
+    <div class="break comment">
+        Google Tasks Backup can export tasks in several formats, but only the Import/Export CSV and GTBak formats can be imported using this application.
     </div>
     <div class="break comment">
         Note that {{ app_title }} does not (yet) support import from Outlook CSV files. 

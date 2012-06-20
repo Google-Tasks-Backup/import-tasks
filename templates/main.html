@@ -128,9 +128,11 @@ This is the Django template for the landing page.
     
     {% if found_paused_job %}
         <br />
-        <div class="take-note-larger" >
+        <div>
             <br />
-            An existing import job has been found. Do you wish to continue importing tasks from that data?
+            <div class="take-note-larger medium-break">
+                An existing import job has been found. Do you wish to continue importing tasks from that data?
+            </div>
             <form>
                 <table  cellspacing="0" class="format-selection" >
                     <tr>
@@ -139,9 +141,20 @@ This is the Django template for the landing page.
                                 type="radio" 
                                 onclick="displayPausedOptions(true);" 
                                 name="continue_pevious_job" 
+                                id="continue_pevious_job_true"
                                 value="True" 
-                                class="radio-button-left" 
-                                checked="checked">Continue importing from previously uploaded data file
+                                class="radio-button-left input_no_wrap" 
+                                checked="checked">
+                            <label for="continue_pevious_job_true" class="input_no_wrap" />
+                                <span class="take-note-larger break">Continue importing from previously uploaded data file</span>
+                                <div class="nice-gap-top description break">
+                                    Previously imported {{ total_progress }} of {{ total_num_rows_to_process }} tasks, {{ remaining_tasks }} remaining
+                                    <br />
+                                    Filename: {{ file_name }}
+                                    <br />
+                                    Uploaded: {{ job_start_timestamp }}
+                                </div>
+                            </label>
                         </td>
                     </tr>
                     <tr>
@@ -151,7 +164,7 @@ This is the Django template for the landing page.
                                 onclick="displayPausedOptions(false);" 
                                 name="continue_pevious_job" 
                                 value="False" 
-                                class="radio-button-left">Upload new data file
+                                class="radio-button-left input_no_wrap"><span class="take-note-larger">Upload new data file</span>
                         </td>
                     </tr>
                 </table>
@@ -174,7 +187,7 @@ This is the Django template for the landing page.
             
             <fieldset>
                 <legend>
-                    Import tasks from CSV file
+                    Import tasks from GTBak or CSV file
                     <img class="popupTrigger" id="help-import" src="/static/help.png" alt="Display help">
                 </legend>
                 <div class="popupContent" id="help-import-content">
@@ -364,19 +377,23 @@ This is the Django template for the landing page.
                                 <ul class="clear">
                                     <li>
                                         <span style="color:red;">WARNING:</span> Choosing this option means that ALL existing tasklists (and their contents) will be deleted!
-                                        <ul>
-                                            <li>
-                                                NOTE: Google does not allow the default tasklist to be deleted.
-                                                The default tasklist is usually named "Default List" or
-                                                "My account name list", but can have any name. It is not necessarily the first tasklist in the list of tasklists. 
-                                            </li>
-                                            <li>
-                                                The default tasklist will be renamed with a unique name, but the contents of the default list will not be modified.
-                                            </li>
-                                        </ul>
                                     </li>
                                     <li>
-                                        For each tasklist in the imported data, create a new tasklist containing only the imported tasks.
+                                        <span style="color:orange;">NOTE:</span> Google does not allow the default tasklist to be deleted.
+                                        The default tasklist is usually named <span class="fixed-font smaller-font">"Default List"</span> or
+                                        <span class="fixed-font smaller-font">"My&nbsp;&lt;AccountName&gt;&nbsp;list"</span>, 
+                                        but can have any name. It is not necessarily the first tasklist in the list of tasklists. 
+                                    </li>
+                                    <ul>
+                                        <li>
+                                            The default tasklist will be renamed as 
+                                            <span class="fixed-font smaller-font">"Undeletable&nbsp;default&nbsp;nnnnnnnnnn"</span>
+                                            (where <span class="fixed-font smaller-font">nnnnnnnnnn</span> is a unique number),
+                                            but the contents of the default list will not be modified or deleted.
+                                        </li>
+                                    </ul>
+                                    <li>
+                                        For each tasklist in the imported data, a new tasklist is created containing only the imported tasks.
                                     </li>
                                 </ul>
                             </div>
@@ -386,7 +403,7 @@ This is the Django template for the landing page.
                 </table>
                 
                 <div class="select-import-file">
-                    <span class="take-note-16">Select CSV file to upload:</span>
+                    <span class="take-note-16">Select GTBak or CSV file file to upload:</span>
                     <img class="popupTrigger" id="help-import" src="/static/warning.png" alt="Display warning">
                     <input type="file" size="100" id="select_file" name="file" onchange="uploadFile();">
                     <div class="nice-gap-top" id="actionMsg">The file must be in the format produced by the {{ app_title }} "Import/Export CSV" format
