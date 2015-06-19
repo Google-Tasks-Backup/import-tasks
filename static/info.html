@@ -4,9 +4,11 @@
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
     <head>
-        <title>Information about Google Tasks</title>
-        <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css" />
+        <title>Information about Google Tasks Import</title>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css" />
+        <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
+        <meta name="keywords" content="Google Tasks Import, Google Tasks, Import Google Tasks">
         <script type="text/javascript">
             // Copyright 2001 Idocs.com      
             // Distribute this script freely, but keep this notice in place
@@ -60,7 +62,7 @@
         <script type="text/javascript">
 
           var _gaq = _gaq || [];
-          _gaq.push(['_setAccount', 'UA-30118203-1']);
+          _gaq.push(['_setAccount', 'UA-34993185-1']);
           _gaq.push(['_trackPageview']);
 
           (function() {
@@ -96,30 +98,45 @@
         <span class="take-note">The GTBak format is strongly recommended</span>, especially where tasks may contain international or extended characters, such as accents or special symbols.
     </div>
     
-    <h3>Import/Export CSV format</h3>
+    
+    
+    <a name="import_export_csv"><h3>Import/Export CSV format</h3></a>
     <div class="break">
         Files exported from Google Tasks Backup in the <span class="take-note">Import/Export CSV</span> format have a filename format 
         of <span class="fixed-font">tasks_import_export_XXXXXX.csv</span>, where <span class="fixed-font">XXXXXX</span> identifies 
         the account name and export date. 
     </div>
     <div class="break">
-        The file is a standard Windows-format CSV (comma-separated-values) file, and includes 
+        The file is a Windows-format CSV (comma-separated-values) file, and includes 
         all task properties required to recreate the tasks, including tasklist name and <span class="no-break">task/sub-task</span> relationships.
     </div>
     <div class="break">
-        The file can be edited in a text editor such as <a href="http://notepad-plus-plus.org/">Notepad++</a> before being imported. It is not recommended to edit this file with a spreadsheet program, as programs such as Excel and OpenOffice Calc tend to corrupt the data. The import file must observe the following rules;
+        The file can be edited in a text editor such as <a href="http://notepad-plus-plus.org/">Notepad++</a> before being imported. 
+        <span class="take-note">Files must be encoded as <span class="fixed-font">UTF-8 without BOM</span>, using Windows CR/LF line endings.</span>
+            <div class="comment medium-break">
+                It is not recommended to edit the CSV file with a spreadsheet program, as programs such as Excel and OpenOffice Calc tend to corrupt the data.
+            </div>
+    </div>
+    <div class="break">
+        The import file must observe the following rules;
         <ul>
-            <li>The first row is a header row, and contains the column names.</li>
+            <li>
+                Each task entry must be on a single line.
+                <ul>
+                    <li>Each line must be terminated with Windows-style CR/LF line ending.</li>
+                    <li>Multi-line notes are supported by using <span class="fixed-font">\n</span> to indicate a line break within the notes field.</li>
+                </ul>
+            </li>
+            <li>The first row is a header row, and must contain the column names.</li>
             <li>Tasks must be grouped by tasklist.</li>
             <li>Tasks must appear in the file in the order that they should appear in the standard "My Order" view in Google Tasks. See the <a href="#import_example">example</a> below.</li>
             <li>Task state must be consistent. Refer to <a href="#Table2">Table 2</a> for valid states.</li>
-            <li>All fields except depth are double-quote delimited strings.</li>
+            <li>All fields except depth must be double-quote delimited strings.</li>
             <li>Double-quotes within text must be escaped (i.e., replace the single <span class="fixed-font">"</span> with <span class="fixed-font">""</span>)</li>
             <li>There must be no spaces between fields and the comma separators.</li>
-            <li>Multi-line text is allowed in the notes field, by using <span class="fixed-font">\n</span> as the line break.</li>
             <li>A blank field may be indicated by <span class="fixed-font">""</span> (empty string) or by having no space between consecutive commas.</li>
             <li>Dates and times are UTC, and must be formatted as indicated in <a href="#Table1">Table 1</a><br />
-                <span class="italic">Note that the "UTC " prefix on date fields serves two purposes. It reminds the user that the fields are UTC, and it prevents spreadsheet programs such as Excel and OpenOffice Calc from rewriting date and time formatting.</span></li>
+                <span class="italic">Note that the "UTC " prefix on date fields serves two purposes. It reminds the user that the fields are UTC, and it prevents spreadsheet programs such as Excel and OpenOffice Calc from rewriting date and time formatting. Google Tasks Import will import yyyy-mm-dd dates without the UTC prefix, but it is recommended to use the prefix.</span></li>
             <li>Editing the CSV file with spreadsheet programs such as Excel or Open Office Calc is not recommended;</li>
                 <ul>
                     <li>
@@ -133,7 +150,7 @@
                         For example, <span class="fixed-font">"2012-05-11"</span> may be changed to <span class="fixed-font">"5/11/12"</span> by Excel.
                     </li>
                     <li>
-                        I have had some success with OpenOffice Calc by choosing "Separated by Comma" and "Quoted field as text"
+                        I have had some success with OpenOffice Calc by choosing "Separated by Comma" and "Quoted field as text", however this is still not recommended.
                     </li>
                 </ul>
             <li>
@@ -154,7 +171,7 @@
             Note that tasklist names are case-sensitive, so if you have an existing tasklist name <span class="fixed-font">"Apples"</span>, and the tasklist name in your import data is <span class="fixed-font">"apples"</span>, a new tasklist named <span class="fixed-font">"apples"</span> will be created even if you have chosen "Add task to existing tasklists."
             </li>
             <li>
-                When importing tasks into an existing tasklist, Import Google Tasks is not able to check for duplicate tasks. The imported task will simply be added to the specified tasklist, potentially resulting in duplicate tasks. If you think that the imported data may contain tasks which already exist in your existing tasklist, you may wish to create new tasklists by appending something to the imported tasklist name (either the date and time, or your own text).
+                When importing tasks into an existing tasklist, Google Tasks Import is not able to check for duplicate tasks. The imported task will simply be added to the specified tasklist, potentially resulting in duplicate tasks. If you think that the imported data may contain tasks which already exist in your existing tasklist, you may wish to create new tasklists by appending something to the imported tasklist name (either the date and time, or your own text), or renaming existing tasklists before importing.
             </li>
             <li>
                 If you are sure that the import data contains the most current list of tasks, you can delete or rename existing tasklists, so that the newly created tasklists will contain only the imported data.
@@ -175,47 +192,68 @@
             <th>
                 Description
             </th>
+            <th>
+                Required
+            </th>
         </tr>
         <tr>
             <td>tasklist_name</td>
             <td>
-                If this is the name of an existing tasklist, tasks will be added to that list.
+                The name of the tasklist into which the task will be imported.
+                <div class="comment">
+                    Tasks may be added to existing or new tasklists, or may replace all the tasks in an existing tasklist, or may even be skipped, depending to the import method chosen when the file is imported. Click on the help icon next to each import method on the <a href="/main">main menu</a> for more details.
+                </div>
+                If a tasklist with that name does not exist, a new tasklist will be created.
                 <br />
-                If the tasklist does not exist, a new tasklist will be created.
+                Tasks with a tasklist_name of <span class="fixed-font">"@default"</span> will be imported into the default tasklist.
             </td>
+            <td><span class="take-note">Required</span></td>
         </tr>
         <tr>
             <td>title</td>
             <td>
                 Task title.
             </td>
-        </tr><tr>
+            <td><span class="take-note">Required</span></td>
+        </tr>
+        <tr>
             <td>notes</td>
             <td>
                 Task notes. May be multi-line, using <span class="fixed-font">\n</span> as the line break.
+                <br />
+                If the task does not have any notes, leave this field blank
             </td>
+            <td>Optional</td>
         </tr>
         <tr>
             <td>status</td>
             <td>
                 Can be either <span class="fixed-font">"needsAction"</span> or <span class="fixed-font">"completed"</span>
             </td>
+            <td><span class="take-note">Required</span></td>
         </tr>
         <tr>
             <td>due</td>
             <td>
-                If the task has a due date, the date that the task is due, in the format <span class="fixed-font">"UTC YYYY-mm-dd"</span>
+                If the task has a due date, the date that the task is due, in the format <span class="fixed-font">"UTC yyyy-mm-dd"</span>
                 <br />
                 If the task does not have a due date, leave this field blank
+                <br />
+                <span class="take-note">It is strongly recommended that dates start with <span class="fixed-font">UTC </span> to reduce the likelyhood of spreadsheet programs changing the date format</span>, however Google Tasks Import will also accept the <span class="fixed-font">"yyyy-mm-dd"</span> format for <span class="fixed-font">due</span>
             </td>
+            <td>Optional</td>
         </tr>
         <tr>
             <td>completed</td>
             <td>
-                If the task has been completed, the date and time that the task was completed, in the format <span class="fixed-font">"UTC YYYY-mm-dd HH:MM:SS"</span>
+                If the task has been completed, the date and time that the task was completed, in the format <span class="fixed-font">"UTC yyyy-mm-dd HH:MM:SS"</span>
                 <br />
                 If the task has not been completed, leave this field blank
+                <br />
+                <span class="take-note">It is strongly recommended that dates start with <span class="fixed-font">UTC </span> to reduce the likelyhood of spreadsheet programs changing the date format</span>, however Google Tasks Import will also accept the following formats for <span class="fixed-font">completed</span>; 
+                <span class="fixed-font">"yyyy-mm-dd HH:MM:SS", "UTC yyyy-mm-dd" and "yyyy-mm-dd"</span>
             </td>
+            <td>Optional</td>
         </tr>
         <tr>
             <td>deleted</td>
@@ -224,6 +262,7 @@
                 <br />
                 If the task has not been deleted, leave this field blank
             </td>
+            <td>Optional</td>
         </tr>
         <tr>
             <td>hidden</td>
@@ -232,6 +271,7 @@
                 <br />
                 If the task has not been hidden, leave this field blank
             </td>
+            <td>Optional</td>
         </tr>
         <tr>
             <td>depth</td>
@@ -242,6 +282,7 @@
                 <br />
                 Tasks with depth 0 are root tasks.
             </td>
+            <td>Optional</td>
         </tr>
     </table>
     
@@ -251,17 +292,17 @@
     <div class="break fixed-font smaller-font">
         "tasklist_name","title","notes","status","due","completed","deleted","hidden",depth
         <br />
-        "My Tasklist","First task","This is a root task","needsAction","2012-08-23",,,,0
+        "My Tasklist","First task","This is a root task","needsAction","UTC 2012-08-23",,,,0
         <br />
-        "My Tasklist","First subtask","This is a subtask of the first task","needsAction","2012-08-19",,,,1
+        "My Tasklist","First subtask","This is a subtask of the first task","needsAction","UTC 2012-08-19",,,,1
         <br />
-        "My Tasklist","Second subtask","This is a subtask\nof the first subtask","needsAction","2012-04-21",,,,2
+        "My Tasklist","Second subtask","This is a subtask\nof the first subtask","needsAction","UTC 2012-04-21",,,,2
         <br />
         "My Tasklist","Third subtask","This is a subtask of the second subtask","needsAction",,,,,3
         <br />
-        "My Tasklist","Fourth subtask","This is a 2nd subtask of the first subtask","needsAction","2012-07-25",,,,1
+        "My Tasklist","Fourth subtask","This is a 2nd subtask of the first subtask","needsAction","UTC 2012-07-25",,,,1
         <br />
-        "My Tasklist","Second task","This is another ""root"" task","completed",,"2012-04-22 02:42:36",,,0
+        "My Tasklist","Second task","This is another ""root"" task","completed",,"UTC 2012-04-22 02:42:36",,,0
     </div>
     
     <div class="minor-heading">This is displayed in Google Tasks as;</div>
@@ -385,7 +426,7 @@
     <table border="1" cellpadding="5">
         <caption class="heading" >Table 2: Task states</caption>
         <tr>
-            <th colspan="3">Task properties <span class="take-note-smaller">(<a href="#notes">Note</a> 1 )</span></th><th rowspan="2">Description</th><th colspan="3">Visible in View:</th>
+            <th colspan="3">Task properties <span class="take-note-smaller">(<a href="#notes">Note 1</a>)</span></th><th rowspan="2">Description</th><th colspan="3">Visible in View:</th>
         </tr>
         <tr>
             <th><span class="property-name">status</span></th>
@@ -393,7 +434,7 @@
             <th><span class="property-name">hidden</span></th>
             <th class="view-tr">My order<br />Sort by date</th>
             <th class="view-tr">Completed tasks</th>
-            <th class="view-tr">Trash<br/><span class="take-note-smaller">(<a href="#notes">Note</a> 2)</span></th>
+            <th class="view-tr">Trash<br/><span class="take-note-smaller">(<a href="#notes">Note 2</a>)</span></th>
         </tr>
         
         <tr>
@@ -427,7 +468,7 @@
  
     <h3>Other problems</h3>
     <div class="break">
-        The <span class="property-name">completed</span> property has occassionally contained invalid timestamps, where the year is stored as a large negative number such as -1701567. In this case, the application sets the <span class="property-name">completed</span> property to "1900-01-01 00:00:00"
+        The <span class="property-name">completed</span> property has occassionally contained invalid timestamps, where the year is stored as 0000, or as a large negative number such as -1701567. In this case, the application sets the <span class="property-name">completed</span> property to "1900-01-01 00:00:00", which is the oldest allowed date.
     </div>
     
     <div class="heading">
@@ -449,7 +490,7 @@
             <td>
                 When tasks are deleted, they are marked as Hidden and moved to the [Trash] view.
                 <br/>
-                According to Google, deleted tasks stay in the Trash (deleted = True) for "some period of time" and are then auto deleted. I have noticed deleted task up to six months old. There does not appear to be any way to force a task to be actually deleted. That is, the Trash bin cannot be emptied by the user.
+                According to Google, deleted tasks stay in the Trash (deleted = True) for "some period of time" and are then auto deleted. I have noticed deleted tasks in my Trash that are up to 10 months old. There does not appear to be any way to force a task to be actually deleted. That is, the Trash bin cannot be emptied by the user.
             </td>
         </tr>
     </table>

@@ -16,7 +16,7 @@
  *          <div class="popup" id="displayHelp1-content">Some content</div>
  *    Note that the content div is not allowed in certain elements (such as <legend>). In that case,
  *    place the content div just after that element.
- *    The pop will display in the position where the content div appears within the source. 
+ *    The popup will display in the position where the content div appears within the source. 
  *    e.g., if the content div is the last element in the body, the popup will appear at the bottom of the page.
  * 5. Add an empty div with class="backgroundPopup" to the bottom of the page
  *          <div class="backgroundPopup"></div>
@@ -114,7 +114,7 @@ $(document).ready(function(){
         setDimensions();
     });
 
-    // Display popup when user clicks on any "popupTrigger" class element
+// Display popup when user clicks on any "popupTrigger" class element
     $(".popupTrigger").click(function(e){
             // Display popup when user clicks on any "popupTrigger" class element
             //currentPopupId = "#" + event.target.id + "-content";

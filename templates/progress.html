@@ -1,6 +1,23 @@
 {% comment %}
+Copyright 2012 Julie Smith.  All Rights Reserved.
 
-status constants: STARTING, INITIALISING, IMPORTING, IMPORT_COMPLETED, ERROR
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+Portions based on Dwight Guth's Google Tasks Porter
+
+This is the Django template for displaying progress to the user.
+
+Uses status constants: STARTING, INITIALISING, IMPORTING, IMPORT_COMPLETED, ERROR
 
 {% endcomment %}
 <?xml version="1.0" encoding="UTF-8"?>
@@ -15,105 +32,23 @@ status constants: STARTING, INITIALISING, IMPORTING, IMPORT_COMPLETED, ERROR
             {% endif %}
         {% endif %}
         
-        <title>{{ app_title }}</title>
+        <title>{{ app_title }} - Progress</title>
         <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css" />
         <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
-        <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
-        
-        <script type="text/javascript" src="/static/jquery.js"></script>
-        <script type="text/javascript" src="/static/popup.js"></script>
-        
+                
         <script type="text/javascript">
 
-            function disableDisplayHtmlButton() {
-                document.getElementById("display-tasks-button").value = "Building display page (this may take many minutes) ...";
-                document.getElementById("display-tasks-button").innerHTML = "Building display page (this may take many minutes) ...";
-                document.getElementById("display-tasks-button").disabled = true;
-                // Also disable retrieve button, since clicking it after display button 
-                // has been clicked, results in display process being interrupted. 
-                // Display button stays disabled, user get selected download file, 
-                // but user never sees the display page.
-                document.getElementById("retrieve-tasks-button").disabled = true;
-            }
-            
-            function changeCompletedSuboptions() {
-                if (document.getElementById("display_completed_tasks").checked) 
-                {
-                    document.getElementById("dim_completed_tasks").checked = true; // Default
-                    document.getElementById("dim_completed_tasks").disabled = false;
-                    document.getElementById("display_completed_date_field").checked = true;
-                    document.getElementById("display_completed_date_field").disabled = false;
-                } else {
-                    document.getElementById("dim_completed_tasks").checked = false;
-                    document.getElementById("dim_completed_tasks").disabled = true;
-                    document.getElementById("display_completed_date_field").checked = false;
-                    document.getElementById("display_completed_date_field").disabled = true;
-                }
-            }
-            
-            function changeCompletedOptions() {
-                if (document.getElementById("due_selection_any_due").checked ||
-                    document.getElementById("due_selection_due_now").checked ||
-                    document.getElementById("due_selection_overdue").checked)
-                {
-                    e = false;
-                } else {
-                    e = true;
-                }
-                document.getElementById("display_completed_tasks").checked = e;
-                changeCompletedSuboptions();
-//                document.getElementById("dim_completed_tasks").checked = e;
-//                document.getElementById("display_completed_date_field").checked = e;
-        }
-            
-            function changeDisplayCompleted() {
-                if (document.getElementById("dim_completed_tasks").checked ||
-                    document.getElementById("display_completed_date_field").checked) 
-                {
-                    document.getElementById("display_completed_tasks").checked = true;
-                }
-            }
-            
-            function setDateFields(day, month, year) {
-                document.getElementById("due_year").value = year;
-                document.getElementById("due_month").value = month + 1; // JS Months are 0-11
-                document.getElementById("due_day").value = day;
-                yearStr = "0000" + year.toString();
-                yearStr = yearStr.substring(yearStr.length - 4);
-                monthStr = "00" + (month + 1).toString();
-                monthStr = monthStr.substring(monthStr.length -2);
-                dayStr = "00" + day.toString();
-                dayStr = dayStr.substring(dayStr.length - 2);
-                document.getElementById("due_date").innerHTML = yearStr + "-" + monthStr + "-" + dayStr;
-            }
-            
-            function setCurrentDueDate() {
-                // Set the current date, which is used when displaying current due tasks.
-                // We take the date from the browser, so that the due date is today in the user's current timezone is used
-                var today = new Date();
-                setDateFields(today.getDate(), today.getMonth(), today.getFullYear());
-            }
-        
         </script>
-        <script type="text/javascript">
-
-          var _gaq = _gaq || [];
-          _gaq.push(['_setAccount', 'UA-30118203-1']);
-          _gaq.push(['_trackPageview']);
-
-          (function() {
-            var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-            ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-            var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-          })();
-
-        </script>
+        {% include "inc_google_analytics.html" %}
     </head>
 
-<body onload="changeCompletedSuboptions(); changeCompletedOptions(); changeDisplayCompleted(); setCurrentDueDate()" > 
-    <div class="usertitle">
-        Authorised user: {{ user_email }} <span class="logout-link">[ <a href="{{ logout_url }}">Log out</a> ]</span>
-    </div>
+<body> 
+    {% include "inc_user_header.html" %}
+
+    {% if display_link_to_production_server %}
+        {% include "inc_limited_access_server_msg.html" %}
+    {% endif %}
+
 
 
     <h2>{{ app_title }}</h2>
@@ -137,142 +72,169 @@ status constants: STARTING, INITIALISING, IMPORTING, IMPORT_COMPLETED, ERROR
     {% endif %}
     
     {% if status == "no-record" %}
-        <div class="break">
-            No import job found for {{ user_email }}
-            <br />
+        <div class="take-note small-break">
+            No import in progress for {{ user_email }}
+        </div>
+            <div class="take-note-larger small-break">
             Please click button to start an import
+            </div>
             <form method="GET" action="{{ url_main_page }}">
                 <button type="submit">Start import</button>
             </form>
-        </div>
-    {% endif %}
-    
-    
-    {% if is_paused %}
-        <br />
-        {% if pause_reason == DAILY_LIMIT_EXCEEDED %}
-            <h3>Daily limit exceeded</h3>
-            <div class="break">
-                This application is running on my personal AppSpot account, which is limited by Google to a total of 5000 task updates per day.
-            </div>
-            <div class="break">
-                The daily quota is reset at midnight Pacific Standard Time (5:00pm Australian Eastern Standard Time, 07:00 UTC).
-            </div>
-            <div class="take-note break">
-                Your import job has been saved. Please rerun <a href="{{ url_home_page }}">{{ app_title }}</a> any time after midnight PST to finish your import.
-            </div>
-            {% if job_msg %}
-                <br />
-                <div class="break">
-                    {{ job_msg }}
-                </div>
-            {% endif %}
-        {% else %}
-            <h3>{{ pause_reason }}</h3>
-            {% if job_msg %}
-                <br />
-                <div class="break">
-                    {{ job_msg }}
-                </div>
-            {% endif %}
-        {% endif %}
     {% else %}
     
-        {% if status == STARTING or status = INITIALISING or status == IMPORTING %}
-            <div class="break">
-                This page will auto-refresh every {{ refresh_interval }} seconds to indicate progress.
-            </div>
-            <div class="break">
-                The import will continue in the background even if this window is closed. 
-                The import status can be checked at any time by returning to this page.
-            </div>
-        {% endif %}
-        {% if status == IMPORT_COMPLETED %}
-            <div class="import-completed-message">
-                <div class="take-note-larger">
-                    Import completed.
+    
+        {% if is_paused %}
+            <br />
+            {% if pause_reason == DAILY_LIMIT_EXCEEDED %}
+                <h3>Daily limit exceeded</h3>
+                <div class="break">
+                    The daily quota is reset at midnight Pacific Standard Time (5:00pm Australian Eastern Standard Time, 07:00 UTC).
+                </div>
+                <div class="take-note break">
+                    Your import job has been saved. Please rerun <a href="{{ url_home_page }}">{{ app_title }}</a> any time after midnight PST to continue importing the rest of your file
+                </div>
+                {% if job_msg %}
+                    <br />
+                    <div class="break">
+                        {{ job_msg }}
+                    </div>
+                {% endif %}
+            {% else %}
+                <h3>{{ pause_reason }}</h3>
+                {% if job_msg %}
+                    <br />
+                    <div class="break">
+                        {{ job_msg }}
+                    </div>
+                {% endif %}
+            {% endif %}
+        {% else %}
+        
+            {% if status == STARTING or status = INITIALISING or status == IMPORTING %}
+                <div class="break">
+                    This page will auto-refresh every {{ refresh_interval }} seconds to indicate progress. 
+                    Note that due to server processing, the status may occasionally remain unchanged for up to 2 minutes.
+                </div>
+                <div class="medium-break">
+                    This window may be safely closed, as the import will continue in the background. An email will be sent to {{ user_email }} when the import has completed.
                 </div>
                 <div class="break">
+                    The import progress can be checked at any time by returning to this page.
+                </div>
+            {% endif %}
+            {% if status == IMPORT_COMPLETED %}
+                <div class="import-completed-message">
+                    <div class="take-note-larger small-break">
+                        Import completed.
+                    </div>
+                    <div class="break">
+                        {% if file_name %}
+                            <div class="small-break">
+                                File name: {{ file_name }}
+                            </div>
+                        {% endif %}
+                        <div class="break">
+                            Import method: {{ import_method }}
+                        </div>
+                        {% if display_tasklist_suffix_msg %}
+                            <div class="comment break">
+                                Appended "{{ import_tasklist_suffix }}" to imported tasklist names{% if used_default_tasklist %} (except default tasklist){% endif %}.
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="medium-break">
+                        {{ job_msg }} 
+                    </div>
+                    
+                </div>
+
+            {% else %}
+                {% if file_name %}
+                    <div class="small-break">
+                        File name: {{ file_name }}
+                    </div>
+                    
+                {% endif %}
+                <div class="break">
                     Import method: {{ import_method }}
-                    {% if import_tasklist_suffix %}
-                        <div class="comment break">
-                            Appended "{{ import_tasklist_suffix }}" to imported tasklist names.
+                </div>
+                
+                <div class="small-break take-note">
+                    Status = {{ status }}
+                </div>
+                {% if data_row_num > 0 %}
+                    <div class="break">
+                        {% if display_separate_progress %}
+                            Processed {{ data_row_num }} of {{ total_num_rows_to_process }} rows of data.
+                            <br />
+                            Imported {{ progress }} tasks.
+                        {% else %}
+                            Imported {{ progress }} of {{ total_num_rows_to_process }} rows of data.
+                        {% endif %}
+                    </div>
+                {% endif %}
+                
+                {% if job_msg %}
+                    <div class="break">
+                        {{ job_msg }}
+                    </div>
+                {% endif %}
+            {% endif %}
+            
+            {% if error_message %}
+                <br />
+                <div class="take-note break">
+                    {{ error_message }}
+                    {% if error_message_extra %}
+                        <br />
+                        <div style="font-family: 'Courier New', Courier, monospace; margin-top: 6px">
+                            {{ error_message_extra }}
                         </div>
                     {% endif %}
                 </div>
-                <div class="medium-break">
-                    {{ job_msg }} 
-                </div>
-            </div>
-
-{% comment %}
-<!--            
-            <form action="{{ url_main_page }}" method="get">
-                <button type="submit" class="big-button" value="Return to main page">Return to main page</button>
-            </form>
--->
-{% endcomment %}
-
-            <form>
-                <input type="button" class="big-button" onClick="window.location.href = '{{ url_main_page }}'" 
-                    value="Return to main page">
-            </form>
-            
-        {% else %}
-            <div class="break">
-                Status = {{ status }}
-            </div>
-            {% comment %}
-                {% if progress > 0 %}
-                    <div class="break">
-                        Progress = {{ progress }} of {{ total_num_rows_to_process }}
-                    </div>
-                {% endif %}
-            {% endcomment %}
-            {% if job_msg %}
                 <div class="break">
-                    {{ job_msg }}
+                    {% if is_invalid_format %}
+                        If you believe that this is an error, please report it at 
+                        <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a>
+                    {% else %}
+                        Please help improve GTI by reporting this error at 
+                        <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a>
+                    {% endif %}
                 </div>
+                <br />
             {% endif %}
+            
+
+            {% if status == STALLED %}
+                <div class="break">
+                    <div class="take-note-larger medium-break comment">
+                        You may try to restart the stalled job. If the job cannot be restarted, please go to the main menu and import a new file.
+                    </div>
+                    <form>
+                        <input type="button" class="big-button" onClick="window.location.href = '{{ continue_job_url }}'" 
+                            value="Try to restart stalled import">
+                    </form>
+                </div>
+            {% endif %}   
+            
+            {% if status == IMPORT_COMPLETED or status == STALLED or status == ERROR or error_message %}
+                <form>
+                    <input type="button" class="big-button" onClick="window.location.href = '{{ url_main_page }}'" 
+                        value="Return to main page">
+                </form>
+            {% endif %}   
+            
+            
+            
         {% endif %}
     {% endif %}
     
-    
-        
-    {% if error_message %}
-        <br />
-        <br />
-        <br />
-        <br />
-        <div class="take-note break">
-        {{ error_message }}
-        </div>
-        <div class="break">
-            Please report this error at <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a>
-        </div>
-        <br />
-        <br />
-        <br />
-    {% endif %}
-    
+    <br />
+    <br />
 
-
-	<div class="project-footer">
-        <div class="break">
-            Version {{ app_version }} ({{ upload_timestamp }})
-        </div>
-        
-		<div class="break">
-			Questions or comments? Go to <a href="http://{{ url_discussion_group }}">{{ url_discussion_group }}</a>
-			or email <a href="mailto:{{ email_discussion_group }}">{{ email_discussion_group }}</a>
-		</div>
-		<div class="break">
-			Please report bugs or suggest improvements at <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a>
-		</div>
-		<div class="break">
-			Source code for this project is at <a href="http://{{ url_source_code }}">{{ url_source_code }}</a>
-		</div>
-	</div>
+    {% include "inc_project_footer.html" %}
+    
 
 	<div class="backgroundPopup"></div>
 

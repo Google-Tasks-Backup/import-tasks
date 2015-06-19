@@ -1,5 +1,5 @@
 {% comment %}
-Copyright 2011 Google Inc.  All Rights Reserved.
+Copyright 2012 Julie Smith.  All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,19 +13,19 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
+Portions based on Dwight Guth's Google Tasks Porter
 
-This is the Django template for the landing page.
+This is the Django template for main import start page.
 {% endcomment %}
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
     <head>
-        <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
         <title>{{ app_title }}</title>
         <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css" />
         <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
-        <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
         <script type="text/javascript" src="/static/jquery.js"></script>
         <script type="text/javascript" src="/static/popup.js"></script>
         <script type="text/javascript">
@@ -82,35 +82,40 @@ This is the Django template for the landing page.
                     hrStr + ":" + minStr + ":" + secStr;
             }
             
+            $(document).ready(function(){
+                // Activate "Choose file" if the user presses enter in the "Import Tasks" form
+                // From http://greatwebguy.com/programming/dom/default-html-button-submit-on-enter-with-jquery/
+                $("#user_suffix, input[name='import_method']").keypress(function (e) {
+                    if ((e.which && (e.which == 13 || e.which == 10)) || 
+                        (e.keyCode && (e.keyCode == 13 || e.keyCode == 10))) {
+                        $('#select_file').click();
+                        return false;
+                    } else {
+                        return true;
+                    }
+                });
+            });
+            
+            
         </script>
-        <script type="text/javascript">
-
-          var _gaq = _gaq || [];
-          _gaq.push(['_setAccount', 'UA-30118203-1']);
-          _gaq.push(['_trackPageview']);
-
-          (function() {
-            var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-            ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-            var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-          })();
-
-        </script>
+        {% include "inc_google_analytics.html" %}
     </head>
 
 {# "{% if found_paused_job %}true" is used, because found_paused_job returns True, which JavaScript doesn't accept due to uppercase T #}
 <body onload="displayPausedOptions( {% if found_paused_job %}true{% else %}false{% endif %} )">
 
-{% if is_authorized %}
-    <div class="usertitle">
-        Authorised user: {{ user_email }} <span class="logout-link">[ <a href="{{ logout_url }}">Log out</a> ]</span>
-    </div>
+    {% include "inc_user_header.html" %}
+
     {% if is_admin_user %}
         <div class="break usertitle">
             <a href="{{ manage_blobstore_url }}">Manage Blobstores</a>
         </div>
     {% endif %}
-{% endif %}
+
+    {% if display_link_to_production_server %}
+        {% include "inc_limited_access_server_msg.html" %}
+    {% endif %}
+
 
     <h2>{{ app_title }}</h2>
   
@@ -126,12 +131,20 @@ This is the Django template for the landing page.
         </div>
     {% endif %}
     
+    <!--
+        <div class="nice-gap-top take-note break">
+            <a href="{{ outlook_instructions_url }}">Instructions for importing from Outlook</a>
+        </div>
+    -->
+    
     {% if found_paused_job %}
         <br />
         <div>
             <br />
             <div class="take-note-larger medium-break">
-                An existing import job has been found. Do you wish to continue importing tasks from that data?
+                An existing import job has been found{% if pause_reason %}, which was stopped because the {{ pause_reason }}{% endif %}
+                <br />
+                Do you wish to continue importing tasks from that data?
             </div>
             <form>
                 <table  cellspacing="0" class="format-selection" >
@@ -140,19 +153,19 @@ This is the Django template for the landing page.
                             <input 
                                 type="radio" 
                                 onclick="displayPausedOptions(true);" 
-                                name="continue_pevious_job" 
-                                id="continue_pevious_job_true"
+                                name="continue_previous_job" 
+                                id="continue_previous_job_true"
                                 value="True" 
                                 class="radio-button-left input_no_wrap" 
                                 checked="checked">
-                            <label for="continue_pevious_job_true" class="input_no_wrap" />
+                            <label for="continue_previous_job_true" class="input_no_wrap" />
                                 <span class="take-note-larger break">Continue importing from previously uploaded data file</span>
                                 <div class="nice-gap-top description break">
                                     Previously imported {{ total_progress }} of {{ total_num_rows_to_process }} tasks, {{ remaining_tasks }} remaining
                                     <br />
                                     Filename: {{ file_name }}
                                     <br />
-                                    Uploaded: {{ job_start_timestamp }}
+                                    Uploaded: {{ job_start_timestamp }} UTC
                                 </div>
                             </label>
                         </td>
@@ -161,8 +174,8 @@ This is the Django template for the landing page.
                         <td class="format-name">
                             <input
                                 type="radio" 
-                                onclick="displayPausedOptions(false);" 
-                                name="continue_pevious_job" 
+                                onclick="displayPausedOptions(false); document.getElementById('force_new_upload').value = 'True';" 
+                                name="continue_previous_job" 
                                 value="False" 
                                 class="radio-button-left input_no_wrap"><span class="take-note-larger">Upload new data file</span>
                         </td>
@@ -173,17 +186,19 @@ This is the Django template for the landing page.
         </div>
     {% endif %}
 
-     
+    
+    
     <div {% if found_paused_job %}class="no-display"{% endif %} id="import_new">
         <form 
             id="selectFileForm" 
-            action="/dummy" 
+            action="/gets_set_by_uploadFile_JavaScript" 
             accept-charset="UTF-8"
             method="POST"
             enctype="multipart/form-data">
             
             <!-- Timestamp is used as tasklist name suffix when creating new import taskslist -->
             <input type="hidden" id="import_timestamp_suffix" name="import_timestamp_suffix" value="0001-01-01 00:00:00" />
+            <input type="hidden" id="force_new_upload" name="force_new_upload" value="False" />
             
             <fieldset>
                 <legend>
@@ -197,7 +212,7 @@ This is the Django template for the landing page.
                         The import option can only process GTBak files, or CSV files that have been specifically formatted for importing into {{ app_title }}, such as those that have been exported from Google Tasks Backup using the "GTBak" or "Import/Export CSV" file format.
                     </div>
                     <div class="medium-break">
-                        <span style="color:red;">CAUTION:</span> Attempting to upload any other file format (such as Outlook), will fail, and may even corrupt your existing tasks!
+                        <span style="color:red;">CAUTION:</span> Attempting to upload any other file format (such as Outlook CSV), will fail, and may even corrupt your existing tasks!
                     </div>
                     <div class="medium-break">
                         For details of the CSV import file format, refer to the <a href="/static/info.html#import_export_description">information page</a>
@@ -224,31 +239,7 @@ This is the Django template for the landing page.
                         </td>
                         <td>
                             Append your own suffix <input id="user_suffix" name="user_suffix" type="text" onfocus="javascript:document.getElementById('use_own_suffix').checked=true;" />
-                            <img class="popupTrigger" id="help-USE_OWN_SUFFIX" src="/static/help.png" alt="Display help">
-                            <img class="popupTrigger" id="help-USE_OWN_SUFFIX" src="/static/warning.png" alt="Display warning">
-                            <div class="popupContent" id="help-USE_OWN_SUFFIX-content">
-                                <img class="popupClose" src="/static/close.png" alt="Close">
-                                <div class="clear">
-                                    <span style="color:red;">WARNING:</span> Extended or international characters are NOT supported when appending to a tasklist name. Only 'normal' un-accented characters may be used.
-                                </div>
-                                <div class="medium-break">
-                                    For each tasklist in the imported data, create a new tasklist (with the suffix)
-                                    containing only the imported tasks for that tasklist.
-                                </div>
-                                <div class="medium-break">
-                                    For example, if the imported task is in a tasklist name "Shopping" and you choose a suffix "New", 
-                                    the task will be imported into a new tasklist named "ShoppingNew". 
-                                </div>
-                                <div class="comment medium-break">
-                                    Note that no space is added, to allow direct concatenation. If you wish to have a space between the existing
-                                    tasklist name and the suffix, then include that space in the start of the suffix field.
-                                </div>
-                                <div class="medium-break">
-                                    NOTE: Google allows duplicate tasklists names. If a tasklist already exists with the new name (e.g., "ShoppingNew"),
-                                    the import process will simply create another tasklist called "ShoppingNew", which will contain all the imported tasks
-                                    that were in the "Shopping" tasklist. Existing tasklists will not be altered.
-                                </div>
-                            </div>
+                            {% include "inc_help_use_own_suffix.html" %}
                         </td>
                     </tr>
                     <tr>
@@ -258,16 +249,7 @@ This is the Django template for the landing page.
                         </td>
                         <td>
                             Import all the tasks into their original tasklist names 
-                            <img class="popupTrigger" id="help-IMPORT_AS_IS" src="/static/help.png" alt="Display help">
-                            <div class="popupContent" id="help-IMPORT_AS_IS-content">
-                                <img class="popupClose" src="/static/close.png" alt="Close">
-                                <div class="clear">
-                                    For each tasklist in the imported data, create a new tasklist containing the imported tasks for that tasklist.
-                                </div>
-                                <div class="medium-break">
-                                    NOTE: Google allows duplicate tasklists names. If a tasklist already exists with the same name as an imported tasklist, the import process will simply create a new tasklist with the same name. Existing tasklists will not be altered. The nett result will be two tasklists with the same name; one with the existing tasks, and one with the imported tasks.
-                                </div>
-                            </div>
+                            {% include "inc_help_import_as_is.html" %}
                         </td>
                     </tr>
                     <tr>
@@ -277,33 +259,7 @@ This is the Django template for the landing page.
                         </td>
                         <td>
                             Add imported tasks to existing tasklist. 
-                            <img class="popupTrigger" id="help-ADD_TO_EXISTING_TASKLIST" src="/static/help.png" alt="Display help">
-                            <div class="popupContent" id="help-ADD_TO_EXISTING_TASKLIST-content">
-                                <img class="popupClose" src="/static/close.png" alt="Close">
-                                <div class="clear">
-                                    For each tasklist in the imported data;
-                                    <ol>
-                                        <li>
-                                            If the tasklist for an imported tasks already exists;
-                                            <ul>
-                                                <li>
-                                                    Imported tasks will be inserted at the top of the list (that is, before existing tasks in the Google tasks view).
-                                                </li>
-                                                <li>
-                                                    NOTE: All tasks in the imported data will be created, even if that task already exists. (It is not possible to check for duplicate tasks.)
-                                                </li>
-                                            </ul>
-                                        <li>
-                                            If the tasklist does not exist;
-                                            <ul>
-                                                <li>
-                                                    Create a new tasklist containing only the imported tasks.
-                                                </li>
-                                            </ul>
-                                        </li>
-                                    </ol>
-                                </div>
-                            </div>
+                            {% include "inc_help_add_to_existing_tasklist.html" %}
                         </td>
                     </tr>
                     <tr>
@@ -313,25 +269,7 @@ This is the Django template for the landing page.
                         </td>
                         <td>
                             Replace tasklist content with imported tasks. 
-                            <img class="popupTrigger" id="help-REPLACE_TASKLIST_CONTENT" src="/static/help.png" alt="Display help">
-                            <div class="popupContent" id="help-REPLACE_TASKLIST_CONTENT-content">
-                                <img class="popupClose" src="/static/close.png" alt="Close">
-                                <div class="clear medium-break">
-                                    For each tasklist in the imported data;
-                                    <ul class="no-bullets">
-                                        <li>
-                                            If a tasklist with the same name exists, delete the existing tasklist (and all the tasks in it).
-                                            <div class="comment medium-break">
-                                                Note that if multiple tasklists exist with the same name, only ONE of those tasklists will be deleted.
-                                                There will therefore still be multiple tasklists with the same name after the import.
-                                            </div>
-                                        </li>
-                                        <li>
-                                            Create a new tasklist containing only the imported tasks.
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
+                            {% include "inc_help_replace_tasklist_content.html" %}
                         </td>
                     </tr>
                     <tr>
@@ -341,25 +279,7 @@ This is the Django template for the landing page.
                         </td>
                         <td>
                             If tasklist with the same name exists, do not import tasks from that tasklist. 
-                            <img class="popupTrigger" id="help-SKIP_DUPLICATE_TASKLIST" src="/static/help.png" alt="Display help">
-                            <div class="popupContent" id="help-SKIP_DUPLICATE_TASKLIST-content">
-                                <img class="popupClose" src="/static/close.png" alt="Close">
-                                <div class="clear break">
-                                    Tasks will only be imported for tasklists that do NOT exist.
-                                </div>
-                                <div class="break">
-                                    For each tasklist in the imported data;
-                                    <ul>
-                                        <li>
-                                            If a tasklist exists with the same name as the task to be imported, skip importing for that tasklist. 
-                                            That is, do not import tasks for a tasklist if a tasklist with that name already exists. 
-                                        </li>
-                                        <li>
-                                            If the tasklist does not exist, create a new tasklist containing only the imported tasks.
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
+                            {% include "inc_help_skip_duplicate_tasklist.html" %}
                         </td>
                     </tr>
                     <tr>
@@ -369,45 +289,21 @@ This is the Django template for the landing page.
                         </td>
                         <td>
                             Delete ALL existing tasklists before importing.
-                            <img class="popupTrigger" id="help-DELETE_BEFORE_IMPORT" src="/static/help.png" alt="Display help">
-                            <img class="popupTrigger" id="help-DELETE_BEFORE_IMPORT" src="/static/warning.png" alt="Display warning">
-                            <div class="popupContent" id="help-DELETE_BEFORE_IMPORT-content">
-                                <img class="popupClose" src="/static/close.png" alt="Close">
-                                <img src="/static/warning_32.png" alt="Display warning">
-                                <ul class="clear">
-                                    <li>
-                                        <span style="color:red;">WARNING:</span> Choosing this option means that ALL existing tasklists (and their contents) will be deleted!
-                                    </li>
-                                    <li>
-                                        <span style="color:orange;">NOTE:</span> Google does not allow the default tasklist to be deleted.
-                                        The default tasklist is usually named <span class="fixed-font smaller-font">"Default List"</span> or
-                                        <span class="fixed-font smaller-font">"My&nbsp;&lt;AccountName&gt;&nbsp;list"</span>, 
-                                        but can have any name. It is not necessarily the first tasklist in the list of tasklists. 
-                                    </li>
-                                    <ul>
-                                        <li>
-                                            The default tasklist will be renamed as 
-                                            <span class="fixed-font smaller-font">"Undeletable&nbsp;default&nbsp;nnnnnnnnnn"</span>
-                                            (where <span class="fixed-font smaller-font">nnnnnnnnnn</span> is a unique number),
-                                            but the contents of the default list will not be modified or deleted.
-                                        </li>
-                                    </ul>
-                                    <li>
-                                        For each tasklist in the imported data, a new tasklist is created containing only the imported tasks.
-                                    </li>
-                                </ul>
-                            </div>
+                            {% include "inc_help_delete_before_import.html" %}
                         </td>
                     </tr>
                 
                 </table>
                 
                 <div class="select-import-file">
-                    <span class="take-note-16">Select GTBak or CSV file file to upload:</span>
+                    <span class="take-note-16">Select GTBak or CSV file to upload:</span>
                     <img class="popupTrigger" id="help-import" src="/static/warning.png" alt="Display warning">
-                    <input type="file" size="100" id="select_file" name="file" onchange="uploadFile();">
-                    <div class="nice-gap-top" id="actionMsg">The file must be in the format produced by the {{ app_title }} "Import/Export CSV" format
-                    <span class="smaller-font">(Refer to the <a href="/static/info.html#import_export_description">information page</a> for details)</span>
+                    <input type="file" id="select_file" name="file" onchange="uploadFile();">
+                    <div class="nice-gap-top" id="actionMsg">
+                    
+                    
+                    
+                    The file must be in the <a href="http://{{ url_GTB }}">Google Tasks Backup</a> <span class="take-note">Import/Export GTBak</span> or <span class="take-note">Import/Export CSV</span> format. Refer to the <a href="/static/info.html#import_export_description">information page</a> for details.</span>
                     </div>
                 </div>
                 <div class="select-import-file">
@@ -428,44 +324,24 @@ This is the Django template for the landing page.
         </form>
     </div>
     <div class="no-display" id="import_existing">
-        <form action="/continue" method="POST">
+        <form action="{{ continue_job_url }}" method="POST">
             <input class="back-button" type="submit" value="Continue importing tasks from previously uploaded file">
-            <div class="continue-job-details">
-                {% if total_progress > 0 %}
-                    <div class="small-break">
-                        Previously imported {{ total_progress }} tasks from total {{ total_num_rows_to_process }} data rows.
-                    </div>
-                {% endif %}
-                <div class="medium-break">File name: {{ file_name }}</div>
-                <div class="small-break">Uploaded: {{ file_upload_time }} UTC</div>
-            </div>
         </form>
     </div>
     <br />
 
-	<div class="project-footer">
-        <div class="break">
-            Version {{ app_version }} ({{ upload_timestamp }})
+    <div class="break">
+        <div class="take-note">
+            CAUTION: Do not make any changes to imported tasklists until the import is complete!
         </div>
-		<div class="break">
-			Questions or comments? Go to <a href="http://{{ url_discussion_group }}">{{ url_discussion_group }}</a>
-			or email <a href="mailto:{{ email_discussion_group }}">{{ email_discussion_group }}</a>
-		</div>
-		<div class="break">
-			Please report bugs or suggest improvements at <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a>
-		</div>
-		<div class="break">
-			Source code for this project is at <a href="http://{{ url_source_code }}">{{ url_source_code }}</a>
-		</div>
-        <div class="break">
-            {{ app_title }} uses cookies for two purposes;
-            <ul>
-                <li>To track your authorisation credentials between pages. This ensure that you (and only you) can get the results of your backup request.</li>
-                <li><a href="http://www.google.com/analytics/">Google Analytics</a> is used to track usage such as; number of unique visitors, location, browser type, operating system. </li>
-            </ul>
+        <div class="medium-break">
+            Moving, adding, deleting or editing tasks in an imported tasklist during an import may result in a corrupted import.
         </div>
-	</div>
+    </div>
+        
+    {% include "inc_project_footer.html" %}
     
+   
 	<div class="backgroundPopup"></div>
 
 </body>

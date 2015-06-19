@@ -12,7 +12,7 @@
  * limitations under the License.
  *
  * OrigAuthor: dwightguth@google.com (Dwight Guth)
- * Author: Julie.Smith.1999@gmail.com (Julie Smith)
+ * Author: Julie.Smith.1999@gmail.com (Julie Smith) 2012
  *
  * Form styling ideas from http://www.webcredible.co.uk/user-friendly-resources/css/css-forms.shtml
  *
@@ -25,6 +25,7 @@ body {
   margin: auto;
   padding-left: 15px;
   padding-right: 15px;
+  counter-reset: H2_ctr; 	/* Create the counter for h2 */
 }
 
 fieldset
@@ -60,7 +61,7 @@ ul li{
 
 .popupContent ul {
     padding-left: 5px;
-    margin-left:10px;
+    margin-left: 10px;
 }
 
 .radio-button-left
@@ -147,6 +148,11 @@ legend
     font-style: italic;
 }
 
+.command-highlight {
+    white-space: nowrap;
+    font-weight: bold;
+}
+
 .property-name {
   font-weight: bold;
   font-family: "Courier New", Courier, monospace;
@@ -221,6 +227,15 @@ legend
   margin-bottom: 20px !important;
 }
 
+.big-break {
+  margin-bottom: 40px !important;
+}
+
+.huge-break {
+  margin-top: 60px !important;
+  margin-bottom: 60px !important;
+}
+
 .small-break {
   margin-bottom: 6px !important;
 }
@@ -249,7 +264,7 @@ legend
 }
 
 .logout-link {
-  margin-left: 20px;
+  margin-left: 10px;
   font-size: smaller;
 }
 
@@ -263,6 +278,7 @@ legend
   font-size: 12pt;
   font-weight: bold;
   padding-right: 10px;
+  margin-top: 8px;
   margin-bottom: 20px;
 }
 
@@ -275,6 +291,27 @@ ul.choose-import-method {
   padding-left: 1.8em;
   padding-bottom: 20px;
 }
+
+ul.import-instructions, ol.import-instructions {
+  padding-left: 1.8em;
+  margin-left: 1.8em;
+}
+
+ul.sub-instructions, ol.sub-instructions {
+  margin-top: 3px;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: 6px;
+}
+
+ul.sub-instructions li, ol.sub-instructions li {
+  margin-top: 3px;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: 1px;
+}
+
+
 
 .task-title  {
   display: inline-block;
@@ -308,6 +345,21 @@ td.action-button {
     padding-right: 10px;
 }
 
+table.comparison {
+    vertical-align:top;
+    border-style:solid;
+    margin-top:12px;
+    padding:6px;
+    border:1;
+    /*border-collapse:collapse;*/
+    /*cellpadding:6px;*/
+}
+
+table.comparison td, table.comparison th {
+    padding: 6px;
+    vertical-align:top;
+}
+
 table.include-selection {
 	border-collapse:separate;
 	/* border-spacing:25px 6px; */ /* Horiz, vert */
@@ -329,7 +381,7 @@ table.include-selection td{
 div.selection-column-header {
     padding-top:5px;    
     font-weight: bold;
-    }
+}
 
 table.format-selection {
 	border-collapse:separate;
@@ -597,6 +649,34 @@ div.task-attribute-hidden-or-deleted {
 ul.no-bullets {
     list-style-type: none; 
 }
+
+.faq * div {
+    margin-bottom: 6px !important;
+    }
+    
+.faq h3, .faq  * h3 {
+    margin-bottom: 6px !important;
+}
+
+.faq h4, .faq  * h4 {
+    margin-bottom: 6px !important;
+}
+
+/* numbering headings */
+h1{ counter-reset: H2_ctr; }
+
+h2.numbered:before {
+  content: counter(H2_ctr, upper-alpha) ". ";
+  counter-increment: H2_ctr;
+}
+h2 .numbered{ counter-reset: H3_ctr; }
+
+h3.numbered:before {
+  content: counter(H1_ctr, upper-alpha) "." counter(H2_ctr, upper-alpha) "." counter(H3_ctr, upper-alpha) " ";
+  counter-increment:H3_ctr;
+}
+
+
 
 /*
  * *********************

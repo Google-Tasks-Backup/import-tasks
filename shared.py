@@ -1,6 +1,5 @@
-#!/usr/bin/python2.5
 #
-# Copyright 2011 Google Inc.  All Rights Reserved.
+# Copyright 2012  Julie Smith.  All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,30 +13,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Original Google Tasks Porter, modified by Julie Smith 2012
+# Portions of this code are from Dwight Guth's Google Tasks Porter
 
-# This module contains code whis is common between classes, or between import-tasks.py and worker.py
+# This module contains code whis is common between classes, modules or related projects
 # Can't use the name common, because there is already a module named common
 
-from apiclient.oauth2client import appengine
+
+# Fix for DeadlineExceeded, because "Pre-Call Hooks to UrlFetch Not Working"
+#     Based on code from https://groups.google.com/forum/#!msg/google-appengine/OANTefJvn0A/uRKKHnCKr7QJ
+from google.appengine.api import urlfetch
+real_fetch = urlfetch.fetch
+def fetch_with_deadline(url, *args, **argv):
+    argv['deadline'] = settings.URL_FETCH_TIMEOUT
+    return real_fetch(url, *args, **argv)
+urlfetch.fetch = fetch_with_deadline
+
+import webapp2
+
+from oauth2client import appengine
 from google.appengine.api import users
 from google.appengine.api import logservice # To flush logs
 from google.appengine.ext import db
 from google.appengine.api import memcache
-from google.appengine.api import taskqueue
-from google.appengine.ext import webapp
 from google.appengine.ext.webapp import template
-from google.appengine.ext import blobstore
-from google.appengine.api import logservice # To flush logs
 
-from apiclient.oauth2client import client
+from oauth2client import client
 from apiclient import discovery
 
 # Import from error so that we can process HttpError
 from apiclient import errors as apiclient_errors
+from google.appengine.api import urlfetch_errors
 
-
-import pickle
 import httplib2
 import Cookie
 import cgi
@@ -45,8 +51,8 @@ import sys
 import os
 import traceback
 import logging
-import datetime
-from datetime import timedelta
+import pickle
+import time
 
 
 # Project-specific imports
@@ -54,6 +60,7 @@ import model
 import settings
 import constants
 import appversion # appversion.version is set before the upload process to keep the version number consistent
+import host_settings
 
 
 logservice.AUTOFLUSH_EVERY_SECONDS = 5
@@ -74,102 +81,6 @@ class DailyLimitExceededError(Exception):
         return msg;
     
 
-def send_job_to_worker(self, process_tasks_job):
-    """ Place the import job details on the taskqueue, so that the worker can proceess the uploaded data.
-        The job may be a new import, or the continuation of a previously started job (using previously uploaded file).
-    
-        When job has been added to taskqueue, user is redirected to Progress page.
-    
-        This method is first called from BlobstoreUploadHandler.post()
-        It is possible for retrieving credentials to fail. If that happens, the user is redirected to authorise,
-        and the OAuthCallbackHandler() redirects to the BlobstoreUploadHandler URL as a GET.
-        This method is then called from the get() handler.
-    """
-
-    fn_name = "send_job_to_worker() "
-    
-    logging.debug(fn_name + "<Start>")
-    logservice.flush()
-    
-    try:
-        # Make sure that we can get valid credentials for the user before starting the worker
-        ok, user, credentials, fail_msg, fail_reason = get_credentials(self)
-        if not ok:
-            # User not logged in, or no or invalid credentials
-            logging.info(fn_name + "Get credentials error: " + fail_msg)
-            logservice.flush()
-            redirect_for_auth(self, user)
-            return
-        
-        user_email = user.email()
-        
-        # ==========================================================
-        #       Create a Taskqueue entry to start the import
-        # ==========================================================
-        process_tasks_job.job_start_timestamp = datetime.datetime.now()
-        process_tasks_job.put()
-        
-        # Add the request to the tasks queue, passing in the user's email so that the task can access the database record
-        q = taskqueue.Queue(settings.PROCESS_TASKS_REQUEST_QUEUE_NAME)
-        t = taskqueue.Task(url=settings.WORKER_URL, params={settings.TASKS_QUEUE_KEY_NAME : user_email}, method='POST')
-        logging.debug(fn_name + "Adding task to %s queue, for %s" % (settings.PROCESS_TASKS_REQUEST_QUEUE_NAME, user_email))
-        logservice.flush()
-        
-        try:
-            q.add(t)
-        except Exception, e:
-            logging.exception(fn_name + "Exception adding task to taskqueue")
-            logservice.flush()
-            
-            process_tasks_job.status = constants.ImportJobStatus.ERROR
-            process_tasks_job.message = ''
-            process_tasks_job.error_message = "Error starting import process: " + get_exception_msg(e)
-            process_tasks_job.job_progress_timestamp = datetime.datetime.now()
-            logging.debug(fn_name + "Job status: '" + str(process_tasks_job.status) + ", progress: " + 
-                str(process_tasks_job.total_progress) + ", msg: '" + 
-                str(process_tasks_job.message) + "', err msg: '" + str(process_tasks_job.error_message))
-            logservice.flush()
-            process_tasks_job.put()
-            
-            # Import process terminated, so delete the blobstore???
-            # blob_key = process_tasks_job.blobstore_key
-            # blob_info = blobstore.BlobInfo.get(blob_key)
-            # delete_blobstore(blob_info)
-            
-            serve_message_page(self, "Error creating tasks import job.",
-                "Please report the following error using the link below",
-                get_exception_msg(e))
-            
-            logging.debug(fn_name + "<End> (error adding job to taskqueue)")
-            logservice.flush()
-            return
-
-        logging.debug(fn_name + "Import job added to taskqueue. Redirect to " + settings.PROGRESS_URL + " for " + str(user_email))
-        logservice.flush()
-        
-        # Redirect to Progress page
-        self.redirect(settings.PROGRESS_URL)
-        
-    except DailyLimitExceededError, e:
-        logging.warning(fn_name + e.msg)
-        
-        serve_message_page(self, "Unable to import tasks - daily limit exceeded", 
-            "This application is running on my personal AppSpot account, which is limited by Google to a total of 5000 task updates per day. " +
-            "The daily quota is reset at midnight Pacific Standard Time (07:00 UTC, 5:00pm Australian Eastern Standard Time).",
-            "Please re-run any time after midnight PST to finish your import.")
-        logging.debug(fn_name + "<End> (Daily Limit Exceeded)")
-        logservice.flush()
-        
-    except Exception, e:
-        logging.exception(fn_name + "Caught top-level exception")
-        self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % get_exception_msg(e))
-        logging.debug(fn_name + "<End> due to exception" )
-        logservice.flush()
-
-    logging.debug(fn_name + "<End>")
-    logservice.flush()
-    
-    
 def set_cookie(res, key, value='', max_age=None,
                    path='/', domain=None, secure=None, httponly=False,
                    version=None, comment=None):
@@ -204,279 +115,7 @@ def delete_cookie(res, key):
     logging.debug("Deleting cookie: " + str(key))
     set_cookie(res, key, '', -1)
     
-    
-def __store_auth_retry_count(self, count):
-    set_cookie(self.response, 'auth_retry_count', str(count), max_age=settings.AUTH_RETRY_COUNT_COOKIE_EXPIRATION_TIME)
-    
-    
-def __reset_auth_retry_count(self):
-    set_cookie(self.response, 'auth_retry_count', '0', max_age=settings.AUTH_RETRY_COUNT_COOKIE_EXPIRATION_TIME)
-    
-    
-def redirect_for_auth(self, user, redirect_url=None):
-    """Redirects the webapp response to authenticate the user with OAuth2.
-    
-        Args:
-            redirect_url        [OPTIONAL] The URL to return to once authorised. 
-                                Usually unused (left as None), so that the URL of the calling page is used
-    
-        Uses the 'state' parameter to store redirect_url. 
-        The handler for /oauth2callback can therefore redirect the user back to the page they
-        were on when get_credentials() failed (or to the specified redirect_url).
-    """
-
-    fn_name = "redirect_for_auth(): "
-    
-    try:
-        client_id, client_secret, user_agent, app_title, product_name, host_msg = get_settings(self.request.host)
-        
-        
-        # Check how many times this has been called (without credentials having been successfully retrieved)
-        if self.request.cookies.has_key('auth_retry_count'):
-            auth_retry_count = int(self.request.cookies['auth_retry_count'])
-            logging.debug(fn_name + "auth_retry_count = " + str(auth_retry_count))
-            if auth_retry_count > settings.MAX_NUM_AUTH_RETRIES:
-                # Exceeded maximum number of retries, so don't try again.
-                # Redirect user to invalid credentials page
-                logging.warning(fn_name + "Not re-authorising, because there have already been " + str(auth_retry_count) + 
-                    " attempts. Redirecting to " + settings.INVALID_CREDENTIALS_URL)
-                self.redirect(settings.INVALID_CREDENTIALS_URL + "?rc=NC&nr=" + str(auth_retry_count))
-                return
-        else:
-            logging.debug(fn_name + "No auth_retry_count cookie found. Probably means last authorisation was more than " +
-                str(settings.AUTH_RETRY_COUNT_COOKIE_EXPIRATION_TIME) + " seconds ago")
-            auth_retry_count = 0
-                
-        if not redirect_url:
-            # By default, return to the same page
-            redirect_url = self.request.path_qs
-            
-            
-        # According to https://developers.google.com/accounts/docs/OAuth_ref#RequestToken
-        # xoauth_displayname is optional. 
-        #     (optional) String identifying the application. 
-        #     This string is displayed to end users on Google's authorization confirmation page. 
-        #     For registered applications, the value of this parameter overrides the name set during registration and 
-        #     also triggers a message to the user that the identity can't be verified. 
-        #     For unregistered applications, this parameter enables them to specify an application name, 
-        #     In the case of unregistered applications, if this parameter is not set, Google identifies the application 
-        #     using the URL value of oauth_callback; if neither parameter is set, Google uses the string "anonymous".
-        # It seems preferable to NOT supply xoauth_displayname, so that Google doesn't display "identity can't be verified" msg.
-        
-        # flow = client.OAuth2WebServerFlow(
-            # client_id=client_id,
-            # client_secret=client_secret,
-            # scope="https://www.googleapis.com/auth/tasks",
-            # user_agent=user_agent,
-            # xoauth_displayname=product_name,
-            # state=redirect_url)
-        flow = client.OAuth2WebServerFlow(
-            client_id=client_id,
-            client_secret=client_secret,
-            scope="https://www.googleapis.com/auth/tasks",
-            user_agent=user_agent,
-            state=redirect_url)
-
-        callback = self.request.relative_url("/oauth2callback")
-        authorize_url = flow.step1_get_authorize_url(callback)
-        memcache.set(user.user_id(), pickle.dumps(flow))
-        
-        # Keep track of how many times we've called the authorise URL
-        if self.request.cookies.has_key('auth_retry_count'):
-            auth_retry_count = int(self.request.cookies['auth_retry_count'])
-        else:
-            auth_retry_count = 0
-        __store_auth_retry_count(self, auth_retry_count + 1)
-
-        logging.debug(fn_name + "Redirecting to " + str(authorize_url))
-        logservice.flush()
-        self.redirect(authorize_url)
-        
-    except Exception, e:
-        logging.exception(fn_name + "Caught top-level exception")
-        self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % get_exception_msg(e))
-        logging.debug(fn_name + "<End> due to exception" )
-        logservice.flush()
-
   
-def get_credentials(self):
-    """ Retrieve credentials for the user
-            
-        Returns:
-            result              True if we have valid credentials for the user
-            user                User object for current user
-            credentials         Credentials object for current user. None if no credentials.
-            fail_msg            If result==False, message suitabale for displaying to user
-            fail_reason         If result==False, cause of the failure. Can be one of
-                                    "User not logged on"
-                                    "No credentials"
-                                    "Invalid credentials"
-                                    "Credential use error" (Unspecified error when attempting to use credentials)
-                                    "Credential use HTTP error" (Returned an HTTP error when attempting to use credentials)
-            
-            
-        If no credentials, or credentials are invalid, the calling method can call redirect_for_auth(self, user), 
-        which sets the redirect URL back to the calling page. That is, user is redirected to calling page after authorising.
-        
-    """    
-        
-    fn_name = "get_credentials(): "
-    
-    user = None
-    fail_msg = ''
-    fail_reason = ''
-    credentials = None
-    result = False
-    try:
-        user = users.get_current_user()
-
-        if user is None:
-            # User is not logged in, so there can be no credentials.
-            fail_msg = "User is not logged in"
-            fail_reason = "User not logged on"
-            logging.debug(fn_name + fail_msg)
-            logservice.flush()
-            return False, None, None, fail_msg, fail_reason
-            
-        credentials = appengine.StorageByKeyName(
-            model.Credentials, user.user_id(), "credentials").get()
-            
-        result = False
-        
-        if credentials:
-            if credentials.invalid:
-                # We have credentials, but they are invalid
-                fail_msg = "Invalid credentials for this user"
-                fail_reason = "Invalid credentials"
-                result = False
-            else:
-                #logging.debug(fn_name + "Calling tasklists service to confirm valid credentials")
-                # so it turns out that the method that checks if the credentials are okay
-                # doesn't give the correct answer unless you try to refresh it.  So we do that
-                # here in order to make sure that the credentials are valid before being
-                # passed to a worker.  Obviously if the user revokes the credentials after
-                # this point we will continue to get an error, but we can't stop that.
-                
-                # Credentials are possibly valid, but need to be confirmed by refreshing
-                # Try multiple times, just in case call to server fails due to external probs (e.g., timeout)
-                # retry_count = settings.NUM_API_TRIES
-                # while retry_count > 0:
-                try:
-                    http = httplib2.Http()
-                    http = credentials.authorize(http)
-                    service = discovery.build("tasks", "v1", http)
-                    tasklists_svc = service.tasklists()
-                    tasklists_list = tasklists_svc.list().execute()
-                    # Successfully used credentials, everything is OK, so break out of while loop 
-                    fail_msg = ''
-                    fail_reason = ''
-                    result = True
-                    # break 
-                    
-                except apiclient_errors.HttpError, e:
-                    logging.info(fn_name + "HttpError using credentials: " + get_exception_msg(e))
-                    if e._get_reason().lower() == "daily limit exceeded":
-                        fail_reason = "Daily limit exceeded"
-                        fail_msg = "HttpError: Daily limit exceeded using credentials."
-                    else:
-                        fail_reason = "Credential use HTTP error"
-                        fail_msg = "Error accessing tasks service: " + e._get_reason()
-                    result = False
-                    credentials = None
-                    result = False
-                    
-                except Exception, e:
-                    logging.info(fn_name + "Exception using credentials: " + get_exception_msg(e))
-                    fail_reason = "Credential use error"
-                    fail_msg = "System error: " + get_exception_msg(e)
-                    credentials = None
-                    result = False
-                        
-        else:
-            # No credentials
-            fail_msg = "No credentials"
-            fail_reason = "Unable to retrieve credentials for user"
-            # logging.debug(fn_name + fail_msg)
-            result = False
-       
-        if result:
-            # TODO: Successfuly retrieved credentials, so reset auth_retry_count to 0
-            __reset_auth_retry_count(self)
-        else:
-            logging.debug(fn_name + fail_msg)
-            logservice.flush()
-                
-    except Exception, e:
-        logging.exception(fn_name + "Caught top-level exception")
-        logging.debug(fn_name + "<End> due to exception" )
-        raise e
-        
-    if fail_reason == "Daily limit exceeded":
-        # Will be caught in calling method's outer try-except
-        raise DailyLimitExceededError()
-        
-    return result, user, credentials, fail_msg, fail_reason
-
-  
-def serve_message_page(self, msg1, msg2 = None, msg3 = None, 
-        show_back_button=False, 
-        back_button_text="Back to previous page",
-        show_custom_button=False, custom_button_text='Try again', custom_button_url=settings.MAIN_PAGE_URL,
-        show_heading_messages=True):
-    """ Serve message.html page to user with message, with an optional button (Back, or custom URL)
-    
-        msg1, msg2, msg3        Text to be displayed.msg2 and msg3 are option. Each msg is displayed in a separate div
-        show_back_button        If True, a [Back] button is displayed, to return to previous page
-        show_custom_button      If True, display button to jump to any URL. title set by custom_button_text
-        custom_button_text      Text label for custom button
-        custom_button_url       URL to go to when custom button is pressed
-        show_heading_messages   If True, display app_title and (optional) host_msg
-    """
-    fn_name = "serve_message_page: "
-
-    logging.debug(fn_name + "<Start>")
-    logservice.flush()
-    
-    try:
-        client_id, client_secret, user_agent, app_title, product_name, host_msg = get_settings(self.request.host)
-
-        if msg1:
-            logging.debug(fn_name + "Msg1: " + msg1)
-        if msg2:
-            logging.debug(fn_name + "Msg2: " + msg2)
-        if msg3:
-            logging.debug(fn_name + "Msg3: " + msg3)
-            
-        path = os.path.join(os.path.dirname(__file__), constants.PATH_TO_TEMPLATES, "message.html")
-          
-        template_values = {'app_title' : app_title,
-                           'host_msg' : host_msg,
-                           'msg1': msg1,
-                           'msg2': msg2,
-                           'msg3': msg3,
-                           'show_heading_messages' : show_heading_messages,
-                           'show_back_button' : show_back_button,
-                           'back_button_text' : back_button_text,
-                           'show_custom_button' : show_custom_button,
-                           'custom_button_text' : custom_button_text,
-                           'custom_button_url' : custom_button_url,
-                           'product_name' : product_name,
-                           'url_discussion_group' : settings.url_discussion_group,
-                           'email_discussion_group' : settings.email_discussion_group,
-                           'url_issues_page' : settings.url_issues_page,
-                           'url_source_code' : settings.url_source_code,
-                           'app_version' : appversion.version,
-                           'upload_timestamp' : appversion.upload_timestamp}
-        self.response.out.write(template.render(path, template_values))
-        logging.debug(fn_name + "<End>" )
-        logservice.flush()
-    except Exception, e:
-        logging.exception(fn_name + "Caught top-level exception")
-        self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a>""" % get_exception_msg(e))
-        logging.debug(fn_name + "<End> due to exception" )
-        logservice.flush()
-    
-
 def format_exception_info(maxTBlevel=5):
     cla, exc, trbk = sys.exc_info()
     excName = cla.__name__
@@ -488,98 +127,56 @@ def format_exception_info(maxTBlevel=5):
     return (excName, excArgs, excTb)
          
 
-def get_exception_name(maxTBlevel=5):
+def get_exception_name():
     cla, exc, trbk = sys.exc_info()
     excName = cla.__name__
     return str(excName)
          
 
-def get_exception_msg(e, maxTBlevel=5):
-    cla, exc, trbk = sys.exc_info()
-    excName = cla.__name__
-    return str(excName) + ": " + str(e)
-         
-
-def delete_blobstore(blob_info):
-    fn_name = "delete_blobstore(): "
+# def get_exception_msg(msg):
+    # cla, exc, trbk = sys.exc_info()
+    # excName = cla.__name__
+    # return str(excName) + ": " + str(msg)
+  
+def get_exception_msg(e = None):
+    """ Return string containing exception type and message
     
-    # logging.debug(fn_name + "<Start>")
-    # logservice.flush()
-    
-    if blob_info:
-        # -------------------------------------
-        #       Delete the Blobstore item
-        # -------------------------------------
-        try:
-            blob_info.delete()
-            logging.debug(fn_name + "Blobstore deleted")
-            logservice.flush()
-        except Exception, e:
-            logging.exception(fn_name + "Exception deleting %s, key = %s" % (blob_info.filename, blob_info.key()))
-            logservice.flush()
-    else:
-        logging.warning(fn_name + "No blobstore to delete")
-        logservice.flush()
-
-    # logging.debug(fn_name + "<End>")
-    # logservice.flush()
-    
-
-def get_settings(hostname):
-    """ Returns a tuple with hostname-specific settings
-    args
-        hostname         -- Name of the host on which this particular app instance is running,
-                            as returned by self.request.host
-    returns
-        client_id        -- The OAuth client ID for app instance running on this particular host
-        client_secret    -- The OAuth client secret for app instance running on this particular host
-        user_agent       -- The user agent string for app instance running on this particular host
-        app_title        -- The page title string for app instance running on this particular host
-        product_name     -- The name displayed on the "Authorised Access to your Google account" page
-        host_msg         -- An optional message which is displayed on some web pages, 
-                            for app instance running on this particular host
+        args:
+            e       [OPTIONAL] An exception type
+            
+        If e is specified, and is of an Exception type, this method returns a 
+        string in the format "Type: Msg" 
+        
+        If e is not specified, or cannot be parsed, "Type: Msg" is
+        returned for the most recent exception
     """
-
-    if hostname.lower().startswith("www."):
-        # If user accessed the service using www.XXXXXX.appspot.com, strip the "www." so we can match settings
-        hostname = hostname[4:]
         
-    if settings.client_ids.has_key(hostname):
-        client_id = settings.client_ids[hostname]
+    # Store current exception msg, in case building msg for e causes an exception
+    cla, exc, trbk = sys.exc_info()
+    if cla:
+        excName = cla.__name__
+        ex_msg = unicode(excName) + ": " + unicode(exc.message)
     else:
-        client_id = None
-        raise KeyError("No ID entry in settings module for host = %s\nPlease check the address" % hostname)
-  
-    if settings.client_secrets.has_key(hostname):
-        client_secret = settings.client_secrets[hostname]
+        ex_msg = "No exception occured"
+    
+    if e:
+        msg = ''
+        try:
+            msg = unicode(e)
+            excName = e.__class__.__name__
+            
+            return str(excName) + ": " + msg
+            
+        except Exception, e1:
+            # Unable to parse passed-in exception 'e', so returning the most recent
+            # exception when this method was called
+            return "Most recent exception = " + ex_msg + " (" + msg + ")"
+            
     else:
-        client_secret = None
-        raise KeyError("No secret entry in settings module for host = %s\nPlease check the address" % hostname)
-  
-    if hasattr(settings, 'user_agents') and settings.user_agents.has_key(hostname):
-        user_agent = settings.user_agents[hostname]
-    else:
-        user_agent = settings.DEFAULT_USER_AGENT
+         return ex_msg           
 
-    if hasattr(settings, 'app_titles') and settings.app_titles.has_key(hostname):
-        app_title = settings.app_titles[hostname]
-    else:
-        app_title = settings.DEFAULT_APP_TITLE
-        
-    if hasattr(settings, 'product_names') and settings.product_names.has_key(client_id):
-        product_name = settings.product_names[client_id]
-    else:
-        product_name = settings.DEFAULT_PRODUCT_NAME
-  
-    if hasattr(settings, 'host_msgs') and settings.host_msgs.has_key(hostname):
-        host_msg = settings.host_msgs[hostname]
-    else:
-        host_msg = None
-  
-    return client_id, client_secret, user_agent, app_title, product_name, host_msg
-  
-
-def isTestUser(user_email):
+         
+def is_test_user(user_email):
     """ Returns True if user_email is one of the defined settings.TEST_ACCOUNTS 
   
         Used when testing to ensure that only test user's details and sensitive data are logged.
@@ -597,12 +194,128 @@ def escape_html(text):
     """Ensure that text is properly escaped as valid HTML"""
     if text is None:
         return None
+    # From http://docs.python.org/howto/unicode.html
+    #   .encode('ascii', 'xmlcharrefreplace')
+    #   'xmlcharrefreplace' uses XML's character references, e.g. &#40960;
     return cgi.escape(text).encode('ascii', 'xmlcharrefreplace').replace('\n','<br />')
     #return cgi.escape(text.decode('unicode_escape')).replace('\n', '<br />')
     #return "".join(html_escape_table.get(c,c) for c in text)
 
     
-# TODO: Untested
-# def runningOnDev():
-    # """ Returns true when running on local dev server. """
-    # return os.environ['SERVER_SOFTWARE'].startswith('Dev')
+def serve_quota_exceeded_page(self):
+    msg1 = "Daily limit exceeded"
+    msg2 = "The daily quota is reset at midnight Pacific Standard Time (5:00pm Australian Eastern Standard Time, 07:00 UTC)."
+    msg3 = "Please rerun " + host_settings.APP_TITLE + " any time after midnight PST to continue importing your file."
+    serve_message_page(self, msg1, msg2, msg3)
+    
+    
+def serve_message_page(self, 
+        msg1, msg2 = None, msg3 = None, 
+        show_back_button=False, 
+        back_button_text="Back to previous page",
+        show_custom_button=False, custom_button_text='Try again', custom_button_url=settings.MAIN_PAGE_URL,
+        show_heading_messages=True,
+        template_file="message.html",
+        extra_template_values=None):
+    """ Serve message.html page to user with message, with an optional button (Back, or custom URL)
+    
+        self                    A webapp.RequestHandler or similar
+        msg1, msg2, msg3        Text to be displayed.msg2 and msg3 are option. Each msg is displayed in a separate div
+        show_back_button        If True, a [Back] button is displayed, to return to previous page
+        show_custom_button      If True, display button to jump to any URL. title set by custom_button_text
+        custom_button_text      Text label for custom button
+        custom_button_url       URL to go to when custom button is pressed
+        show_heading_messages   If True, display app_title and (optional) host_msg
+        template_file           Specify an alternate HTML template file
+        extra_template_values   A dictionary containing values that will be merged with the existing template values
+                                    They may be additional parameters, or overwrite existing parameters.
+                                    These new values will be available to the HTML template.
+                                    
+        All args except self and msg1 are optional.
+    """
+    fn_name = "serve_message_page: "
+
+    logging.debug(fn_name + "<Start>")
+    logservice.flush()
+    
+    try:
+        if msg1:
+            logging.debug(fn_name + "Msg1: " + msg1)
+        if msg2:
+            logging.debug(fn_name + "Msg2: " + msg2)
+        if msg3:
+            logging.debug(fn_name + "Msg3: " + msg3)
+            
+        path = os.path.join(os.path.dirname(__file__), constants.PATH_TO_TEMPLATES, template_file)
+          
+        template_values = {'app_title' : host_settings.APP_TITLE,
+                           'host_msg' : host_settings.HOST_MSG,
+                           'msg1': msg1,
+                           'msg2': msg2,
+                           'msg3': msg3,
+                           'show_heading_messages' : show_heading_messages,
+                           'show_back_button' : show_back_button,
+                           'back_button_text' : back_button_text,
+                           'show_custom_button' : show_custom_button,
+                           'custom_button_text' : custom_button_text,
+                           'custom_button_url' : custom_button_url,
+                           'product_name' : host_settings.PRODUCT_NAME,
+                           'url_discussion_group' : settings.url_discussion_group,
+                           'email_discussion_group' : settings.email_discussion_group,
+                           'url_main_page' : settings.MAIN_PAGE_URL,
+                           'url_issues_page' : settings.url_issues_page,
+                           'url_source_code' : settings.url_source_code,
+                           'app_version' : appversion.version,
+                           'upload_timestamp' : appversion.upload_timestamp}
+                           
+        if extra_template_values:
+            # Add/update template values
+            # logging.debug(fn_name + "DEBUG: Updating template values ==>")
+            # logging.debug(extra_template_values)
+            # logservice.flush()
+            template_values.update(extra_template_values)
+            
+        self.response.out.write(template.render(path, template_values))
+        logging.debug(fn_name + "<End>" )
+        logservice.flush()
+    except Exception, e:
+        logging.exception(fn_name + "Caught top-level exception")
+        serve_outer_exception_message(self, e)
+        logging.debug(fn_name + "<End> due to exception" )
+        logservice.flush()
+    
+
+def serve_outer_exception_message(self, e):
+    """ Display an Oops message when something goes very wrong. 
+    
+        This is called from the outer exception handler of major methods (such as get/post handlers)
+    """
+    fn_name = "serve_outer_exception_message: "
+    
+    self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br /><br />This system is in beta, and is being activeley developed.<br />Please report any errors to <a href="http://%s">%s</a> so that they can be fixed. Thank you.""" % 
+        ( get_exception_msg(e), settings.url_issues_page, settings.url_issues_page))
+        
+        
+    logging.error(fn_name + get_exception_msg(e))
+    logservice.flush()
+    
+    
+def reject_non_test_user(self):
+    fn_name = "reject_non_test_user: "
+    
+    logging.debug(fn_name + "Rejecting non-test user on limited access server")
+    logservice.flush()
+    
+    # self.response.out.write("<html><body><h2>This is a test server. Access is limited to test users.</h2>" +
+                    # "<br /><br /><div>Please use the production server at <href='http://tasks-backup.appspot.com'>tasks-backup.appspot.com</a></body></html>")
+                    # logging.debug(fn_name + "<End> (restricted access)" )
+    serve_message_page(self, 
+        "This is a test server. Access is limited to test users.",
+        "Please click the button to go to the production server at " + settings.PRODUCTION_SERVERS[0],
+        show_custom_button=True, 
+        custom_button_text='Go to live server', 
+        custom_button_url='http://' + settings.PRODUCTION_SERVERS[0],
+        show_heading_messages=False)
+                    
+                    
+                    

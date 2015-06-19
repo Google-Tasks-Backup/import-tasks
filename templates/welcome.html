@@ -1,5 +1,5 @@
 {% comment %}
-Copyright 2011 Google Inc.  All Rights Reserved.
+Copyright 2012 Julie Smith.  All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,8 +13,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
+Portions based on Dwight Guth's Google Tasks Porter
 
-This is the Django template for the landing page.
+This is the Django template for the welcome page.
 {% endcomment %}
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
@@ -24,8 +25,8 @@ This is the Django template for the landing page.
         <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
         <title>{{ app_title }}</title>
         <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css" />
-        <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
-        <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+        <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico?v=2" />
+        <meta name="keywords" content="Google Tasks Import, Google Tasks, Import Google Tasks">
         <script type="text/javascript" src="/static/jquery.js"></script>
         <script type="text/javascript" src="/static/popup.js"></script>
         <script type="text/javascript">
@@ -34,44 +35,31 @@ This is the Django template for the landing page.
                 document.getElementById("authorise_button").value = "Authorising, please wait (this may take up to half a minute) ...";
                 document.getElementById("authorise_button").innerHTML = "Authorising, please wait (this may take up to half a minute) ...";
                 document.getElementById("authorise_button").disabled = true;
-                window.location.href = "/auth";
-            }
-
-            function start() {
-                document.getElementById("start_button").value = "Starting ...";
-                document.getElementById("start_button").innerHTML = "Starting ...";
-                document.getElementById("start_button").disabled = true;
                 window.location.href = "{{ url_main_page }}";
             }
 
         </script>
-        <script type="text/javascript">
-
-          var _gaq = _gaq || [];
-          _gaq.push(['_setAccount', 'UA-30118203-1']);
-          _gaq.push(['_trackPageview']);
-
-          (function() {
-            var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-            ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-            var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-          })();
-
-        </script>
+        {% include "inc_google_analytics.html" %}
     </head>
 
 <body>
 
-{% if is_authorized %}
-    <div class="usertitle">
-        Authorised user: {{ user_email }} <span class="logout-link">[ <a href="{{ logout_url }}">Log out</a> ]</span>
-    </div>
+    {% include "inc_user_header.html" %}
+
     {% if is_admin_user %}
         <div class="break usertitle">
             <a href="{{ manage_blobstore_url }}">Manage Blobstores</a>
         </div>
+        <div class="usertitle">
+            <a href="{{ retrieve_stats_csv_url }}">Retrieve stats CSV</a>
+        </div>
     {% endif %}
-{% endif %}
+
+    
+    {% if display_link_to_production_server %}
+        {% include "inc_limited_access_server_msg.html" %}
+    {% endif %}
+    
 
     <h2>{{ app_title }}</h2>
     
@@ -88,27 +76,109 @@ This is the Django template for the landing page.
         </div>
     {% endif %}
 
-    {% if msg == "ACCOUNT_ERROR" %}
+    {% if msg == "ACCOUNT_ERROR" or msg == "TIMEOUT" %}
         <div class="break">
-            <span class="take-note-larger">
-                An error occurred authorizing your account.  
-            </span>
             <br />
-            This could be because your Google Apps account is not authorised to access this application, or
-            your account is not currently in good standing with Google. If this
-            happens again, please <a href="http:/{{ url_issues_page }}">report the issue</a> so that we can try to fix it.
+            <br />
+            {% if msg == "TIMEOUT"%}
+                <div class="break take-note-larger">
+                    The server timed out authorizing your account. Please try again.
+                </div>
+            {% else %}
+                <div class="medium-break take-note-larger">
+                    An error occurred authorizing your account.  
+                </div>
+                Possible reasons;
+                <ul>
+                    <li> there is a server or communications problem, or </li>
+                    <li> your Google Apps account is not authorised to access this application, or </li>
+                    <li> your account is not currently in good standing with Google. </li>
+                </ul>
+                <div class="medium-break take-note-larger">
+                    Please try again
+                </div>
+            {% endif %}
+            
+            <div class="break">
+                <br />
+                If this happens again, please <a href="http:/{{ url_issues_page }}">report the issue</a> so that we can try to fix it.  
+            </div>
+            <br />
+            <br />
+            <br />
         </div>
     {% endif %}
     
+    
     <div class="small-break">
         {{ app_title }} can import tasks from 2 different <a href="http://{{ url_GTB }}">Google Tasks Backup</a> formats; 
-        <span class="take-note">Import/Export GTBak</span> and <span class="take-note">Import/Export CSV</span>. 
-        The <span class="take-note">GTBak format is recommened</span>, especially if your tasks contain international or extended characters. 
+        <span class="take-note">Import/Export GTBak</span> and <span class="take-note">Import/Export CSV</span>
+        <sup><a class="popupTrigger" id="help-CSV_DESCRIPTION" href="#note1">1</a></sup>.
+        <div class="popupContent" id="help-CSV_DESCRIPTION-content">
+            <img class="popupClose" src="/static/close.png" alt="Close">
+            <div class="clear">
+            
+                For details of the CSV import file format, refer to the <a href="/static/info.html#import_export_description">information page</a>.
+            </div>
+            <div class="medium-break">
+                The CSV format may not support all international or extended characters, but may be edited by a text editor such as
+                <a href="http://notepad-plus-plus.org/">Notepad++</a> using UTF-8 encoding (without BOM). 
+            </div>
+            <div class="comment medium-break">
+                It is not recommended to edit the CSV file with a spreadsheet program, as programs such as Excel and OpenOffice Calc tend to corrupt the data.
+            </div>
+        </div>
+     
+        <br />
+        <span class="comment">The <span class="take-note">GTBak format is recommended</span>, especially if your tasks contain international or extended characters. </span>
     </div>
     
-    <div class="medium-break">
-        There are several methods for importing tasks (chosen on next page);
-    </div>
+    {% if not display_link_to_production_server %}
+        <div class="nice-gap-top">
+            Import from Outlook CSV files is not supported<sup>
+            <a class="popupTrigger" id="help-OUTLOOK_NOT_SUPPORTED" href="#note2">2</a></sup>, however you can download <span class="fixed-font">{{ eot_executable_name }}</span> to export tasks from Outlook in a format that can be imported by this app. <a href="{{ outlook_instructions_url }}">Instructions for exporting tasks from Outlook</a>
+        </div>
+        <div class="popupContent" id="help-OUTLOOK_NOT_SUPPORTED-content">
+            <img class="popupClose" src="/static/close.png" alt="Close">
+            <div class="clear">
+                The export file from Outlook cannot be reliably imported, because;
+                <ul>
+                    <li>Outlook uses Microsoft ANSI encoding, which has very poor support for non-English characters, meaning that International and extended characters cannot be interpretted correctly</li>
+                    <li>Outlook's date formatting depends on locale, resulting in ambiguous date formatting</li>
+                    <li>Column names vary by locale, so cannot be reliably interpretted</li>
+                </ul>
+            </div>
+            <div class="medium-break">
+                For more details, and for instructions on exporting data from Outlook that can be imported, refer to the <a href="{{ outlook_instructions_url }}">instructions for exporting tasks from Outlook</a>
+            </div>
+        </div>
+    {% endif %}
+    
+    {% if display_link_to_production_server %}
+        <input type="button" class="big-button" onClick="window.location.href = 'http://{{ production_server }}'" 
+               value="Go to live server">
+        <div class="medium-break">
+            <br />
+            The production server allows several methods for importing tasks;
+        </div>
+    {% else %}
+        <div class="medium-break">
+            This application uses Google authentication to access your Tasks data. The permission for this application will be displayed as "{{ product_name }} - Tasks" in your list of 
+            <a href="https://www.google.com/accounts/IssuedAuthSubTokens">Authorised Sites, Apps, and Services</a>, and can be revoked there at any time.
+        </div>
+    
+        {% if user_email %}
+            <button id="authorise_button" class="big-button" type="button" 
+                    onclick="window.location.href = '{{ url_main_page }}'">Main menu</button>
+        {% else %}
+            <button id="authorise_button" class="big-button" type="button" onclick="authorise();">Authorise</button>
+        {% endif %}
+        <div class="medium-break">
+            <br />
+            There are several methods for importing tasks (chosen on next page);
+        </div>
+    {% endif %}
+    
     <div class="break">
         <table  cellspacing="0" class="format-selection" id="import_method_table">
             <tr>
@@ -127,45 +197,16 @@ This is the Django template for the landing page.
                 </td>
                 <td>
                     Append your own suffix 
-                    <img class="popupTrigger" id="help-USE_OWN_SUFFIX" src="/static/help.png" alt="Display help">
-                    <div class="popupContent" id="help-USE_OWN_SUFFIX-content">
-                        <img class="popupClose" src="/static/close.png" alt="Close">
-                        <div class="clear">
-                            For each tasklist in the imported data, create a new tasklist (with the suffix)
-                            containing only the imported tasks for that tasklist.
-                        </div>
-                        <div class="medium-break">
-                            For example, if the imported task is in a tasklist name "Shopping" and you choose a suffix "New", 
-                            the task will be imported into a new tasklist named "ShoppingNew". 
-                        </div>
-                        <div class="comment medium-break">
-                            Note that no space is added, to allow direct concatenation. If you wish to have a space between the existing
-                            tasklist name and the suffix, then include that space in the start of the suffix field.
-                        </div>
-                        <div class="medium-break">
-                            NOTE: Google allows duplicate tasklists names. If a tasklist already exists with the new name (e.g., "ShoppingNew"),
-                            the import process will simply create another tasklist called "ShoppingNew", which will contain all the imported tasks
-                            that were in the "Shopping" tasklist. Existing tasklists will not be altered.
-                        </div>
-                    </div>
+                    {% include "inc_help_use_own_suffix.html" %}
                 </td>
             </tr>
             <tr>
                 <td class="format-name">
                     {{ IMPORT_AS_IS }}
-                </td>
+                    </td>
                 <td>
                     Import all the tasks into their original tasklist names 
-                    <img class="popupTrigger" id="help-IMPORT_AS_IS" src="/static/help.png" alt="Display help">
-                    <div class="popupContent" id="help-IMPORT_AS_IS-content">
-                        <img class="popupClose" src="/static/close.png" alt="Close">
-                        <div class="clear">
-                            For each tasklist in the imported data, create a new tasklist containing the imported tasks for that tasklist.
-                        </div>
-                        <div class="medium-break">
-                            NOTE: Google allows duplicate tasklists names. If a tasklist already exists with the same name as an imported tasklist, the import process will simply create a new tasklist with the same name. Existing tasklists will not be altered. The nett result will be two tasklists with the same name; one with the existing tasks, and one with the imported tasks.
-                        </div>
-                    </div>
+                    {% include "inc_help_import_as_is.html" %}
                 </td>
             </tr>
             <tr>
@@ -174,33 +215,7 @@ This is the Django template for the landing page.
                 </td>
                 <td>
                     Add imported tasks to existing tasklist. 
-                    <img class="popupTrigger" id="help-ADD_TO_EXISTING_TASKLIST" src="/static/help.png" alt="Display help">
-                    <div class="popupContent" id="help-ADD_TO_EXISTING_TASKLIST-content">
-                        <img class="popupClose" src="/static/close.png" alt="Close">
-                        <div class="clear">
-                            For each tasklist in the imported data;
-                            <ol>
-                                <li>
-                                    If the tasklist for an imported tasks already exists;
-                                    <ul>
-                                        <li>
-                                            Imported tasks will be inserted at the top of the list (that is, before existing tasks in the Google tasks view).
-                                        </li>
-                                        <li>
-                                            NOTE: All tasks in the imported data will be created, even if that task already exists. (It is not possible to check for duplicate tasks.)
-                                        </li>
-                                    </ul>
-                                <li>
-                                    If the tasklist does not exist;
-                                    <ul>
-                                        <li>
-                                            Create a new tasklist containing only the imported tasks.
-                                        </li>
-                                    </ul>
-                                </li>
-                            </ol>
-                        </div>
-                    </div>
+                    {% include "inc_help_add_to_existing_tasklist.html" %}
                 </td>
             </tr>
             <tr>
@@ -209,25 +224,7 @@ This is the Django template for the landing page.
                 </td>
                 <td>
                     Replace tasklist content with imported tasks. 
-                    <img class="popupTrigger" id="help-REPLACE_TASKLIST_CONTENT" src="/static/help.png" alt="Display help">
-                    <div class="popupContent" id="help-REPLACE_TASKLIST_CONTENT-content">
-                        <img class="popupClose" src="/static/close.png" alt="Close">
-                        <div class="clear medium-break">
-                            For each tasklist in the imported data;
-                            <ul class="no-bullets">
-                                <li>
-                                    If a tasklist with the same name exists, delete the existing tasklist (and all the tasks in it).
-                                    <div class="comment medium-break">
-                                        Note that if multiple tasklists exist with the same name, only ONE of those tasklists will be deleted.
-                                        There will therefore still be multiple tasklists with the same name after the import.
-                                    </div>
-                                </li>
-                                <li>
-                                    Create a new tasklist containing only the imported tasks.
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
+                    {% include "inc_help_replace_tasklist_content.html" %}
                 </td>
             </tr>
             <tr>
@@ -236,25 +233,7 @@ This is the Django template for the landing page.
                 </td>
                 <td>
                     If tasklist with the same name exists, do not import tasks from that tasklist. 
-                    <img class="popupTrigger" id="help-SKIP_DUPLICATE_TASKLIST" src="/static/help.png" alt="Display help">
-                    <div class="popupContent" id="help-SKIP_DUPLICATE_TASKLIST-content">
-                        <img class="popupClose" src="/static/close.png" alt="Close">
-                        <div class="clear break">
-                            Tasks will only be imported for tasklists that do NOT exist.
-                        </div>
-                        <div class="break">
-                            For each tasklist in the imported data;
-                            <ul>
-                                <li>
-                                    If a tasklist exists with the same name as the task to be imported, skip importing for that tasklist. 
-                                    That is, do not import tasks for a tasklist if a tasklist with that name already exists. 
-                                </li>
-                                <li>
-                                    If the tasklist does not exist, create a new tasklist containing only the imported tasks.
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
+                    {% include "inc_help_skip_duplicate_tasklist.html" %}
                 </td>
             </tr>
             <tr>
@@ -263,30 +242,7 @@ This is the Django template for the landing page.
                 </td>
                 <td>
                     Delete ALL existing tasklists before importing.
-                    <img class="popupTrigger" id="help-DELETE_BEFORE_IMPORT" src="/static/help.png" alt="Display help">
-                    <img class="popupTrigger" id="help-DELETE_BEFORE_IMPORT" src="/static/warning.png" alt="Display warning">
-                    <div class="popupContent" id="help-DELETE_BEFORE_IMPORT-content">
-                        <img class="popupClose" src="/static/close.png" alt="Close">
-                        <img src="/static/warning_32.png" alt="Display warning">
-                        <ul class="clear">
-                            <li>
-                                <span style="color:red;">WARNING:</span> Choosing this option means that ALL existing tasklists (and their contents) will be deleted!
-                                <ul>
-                                    <li>
-                                        NOTE: Google does not allow the default tasklist to be deleted.
-                                        The default tasklist is usually named "Default List" or
-                                        "My account name list", but can have any name. It is not necessarily the first tasklist in the list of tasklists. 
-                                    </li>
-                                    <li>
-                                        The default tasklist will be renamed with a unique name, but the contents of the default list will not be modified.
-                                    </li>
-                                </ul>
-                            </li>
-                            <li>
-                                For each tasklist in the imported data, create a new tasklist containing only the imported tasks.
-                            </li>
-                        </ul>
-                    </div>
+                    {% include "inc_help_delete_before_import.html" %}
                 </td>
             </tr>
         
@@ -297,65 +253,15 @@ This is the Django template for the landing page.
         
     </div>        
         
-    {% if is_authorized %}
-        <button id="start_button" class="big-button" type="button" onclick="start();">Start</button>
-    {% else %}
-        <div class="medium-break">
-            This application uses Google authentication to access your Tasks data. The permission for this application will be displayed as "{{ product_name }} - Tasks" in your list of 
-            <a href="https://www.google.com/accounts/IssuedAuthSubTokens">Authorised Sites, Apps, and Services</a>, and can be revoked there at any time.
-        </div>
-        <button id="authorise_button" class="big-button" type="button" onclick="authorise();">Authorise</button>
-    {% endif %}
+   
+    {% include "inc_project_footer.html" %}
     
     <div class="nice-gap-top break">
         This application is currently in beta. 
+        <br />
 		You are welcome to try it, but I cannot give any guarantee that imported tasks will be correct or in a usable format. 
-        It is running from my personal Google Apps account, and so has quota limitations. 
     </div>
    
-
-    <div class="break">
-        For details of the CSV import file format, refer to the <a href="/static/info.html#import_export_description">information page</a>.
-        The CSV format may not support all international or extended characters, but may be edited by a text editor such as
-        <a href="http://notepad-plus-plus.org/">Notepad++</a> before being imported. 
-        It is not recommended to edit the CSV file with a spreadsheet program, as programs such as Excel and OpenOffice Calc tend to 
-        corrupt the data.
-    </div>
-    <div class="break">
-        
-    </div>
-    
-    <div class="break">
-    </div>
-    <div class="break comment">
-        Google Tasks Backup can export tasks in several formats, but only the Import/Export CSV and GTBak formats can be imported using this application.
-    </div>
-    <div class="break comment">
-        Note that {{ app_title }} does not (yet) support import from Outlook CSV files. 
-        Support for Outlook CSV may be added if sufficient people request it at <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a>
-    </div>
-    
-	<div class="project-footer">
-        <div class="break">
-            Version {{ app_version }} ({{ upload_timestamp }})
-        </div>
-		<div class="break">
-			Questions or comments? Go to <a href="http://{{ url_discussion_group }}">{{ url_discussion_group }}</a>
-		</div>
-		<div class="break">
-			Please report bugs or suggest improvements at <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a>
-		</div>
-		<div class="break">
-			Source code for this project is at <a href="http://{{ url_source_code }}">{{ url_source_code }}</a>
-		</div>
-        <div class="break">
-            {{ app_title }} uses cookies for two purposes;
-            <ul>
-                <li>To track your authorisation credentials between pages. This ensure that you (and only you) can get the results of your backup request.</li>
-                <li><a href="http://www.google.com/analytics/">Google Analytics</a> is used to track usage such as; number of unique visitors, location, browser type, operating system. </li>
-            </ul>
-        </div>
-	</div>
     
 	<div class="backgroundPopup"></div>
 

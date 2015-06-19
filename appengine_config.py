@@ -1,4 +1,3 @@
-#!/usr/bin/python2.5
 #
 # Copyright 2011 Google Inc.  All Rights Reserved.
 #
@@ -16,13 +15,14 @@
 
 # Original __author__ = "dwightguth@google.com (Dwight Guth)"
 
-"""Import Google Tasks configuration file."""
+"""Google Tasks Import configuration file."""
 
 __author__ = "julie.smith.1999@gmail.com (Julie Smith)"
 
-from google.appengine.dist import use_library
 
-use_library("django", "1.2")
+from google.appengine.ext.webapp import template
+
+template.register_template_library("common.customdjango")
 
 
 # Start FIX1: 2012-06-16
@@ -71,8 +71,9 @@ def from_fieldstorage(cls, fs):
                     field_value = field_value.decode(
                       field.type_options['charset']).encode(common_charset)
 
-            # TODO: Should we take care of field.name here?
-            obj.add(field.name, field_value)
+                # JS 2012-09-15: Indented as suggested by http://code.google.com/p/googleappengine/issues/detail?id=2749#c54
+                # TODO: Should we take care of field.name here?
+                obj.add(field.name, field_value)
 
     return obj
 

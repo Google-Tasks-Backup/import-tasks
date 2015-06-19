@@ -1,0 +1,93 @@
+
+# version becomes sub-domain of application
+#   i.e., VERSION-dot-APP-ID.appspot.com
+# Default version is set via admin console
+
+# When testing, only use Major and Minor (e.g., 'test-gti-0-4')
+#   Where 0 is the Major and 4 is the Minor
+# When going live, use the full version number (e.g., 'gti-0-4-304')
+#   Where 0 is the Major, 4 is the Minor and 304 is the Revision
+version: gti-0-6-003
+#version: test-gti-0-6
+
+# ===== Production server ======
+application: import-tasks
+
+# ===== Test server ======
+#application: my-test-tasks-import
+
+# ===== Local host ==========
+#application: tasks-backup-local
+
+threadsafe: false
+runtime: python27
+api_version: 1
+
+# Force static files to remain cached by the browser for 5 minutes
+# This is so that potentially updated versions of install files will
+# be available to the user ASAP, whilst still allowing most users
+# to have all static content cached, as most users will use the
+# website for less than 5 minutes.
+default_expiration: "5m"
+
+libraries:
+- name: django
+  version: "1.2"
+  
+
+error_handlers:
+  - file: error_handlers/error_default.html
+
+  - error_code: over_quota
+    file: error_handlers/error_over_quota.html
+    
+  - error_code: dos_api_denial
+    file: error_handlers/error_dos.html
+  
+  - error_code: timeout
+    file: error_handlers/error_timeout.html
+
+    
+handlers:
+- url: /static
+  static_dir: static
+  secure: always
+  
+
+- url: /favicon.ico
+  static_files: static/favicon.ico
+  upload: favicon.ico
+  secure: always
+  
+- url: /info
+  static_files: static/info.html
+  upload: info.html
+  secure: always
+  
+- url: /worker
+  script: worker.app
+  login: admin
+  secure: always
+
+- url: /admin/.*
+  script: admin.app
+  login: admin
+  secure: always
+
+# Main page does not require login, so that anyone can read main page before authorising
+- url: /
+  script: import_tasks.app
+  secure: always
+
+# robots.txt is handled programmatically, because we want to return "disallow all"
+# for test servers, but allow robots on the production server.
+- url: /robots.txt
+  script: import_tasks.app
+  secure: optional
+
+# All other pages require user to be logged in
+- url: /.+
+  script: import_tasks.app
+  login: required
+  secure: always
+

@@ -1,0 +1,487 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC
+  "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <title>Import tasks from Outlook to Google Tasks</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="description" content="" />
+        <meta name="keywords" content="" />
+        <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css" />
+        <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="keywords" content="Google Tasks Import, Google Tasks, Import Google Tasks, Import Google Tasks from Outlook">
+        <script type="text/javascript">
+
+          var _gaq = _gaq || [];
+          _gaq.push(['_setAccount', 'UA-34993185-1']);
+          _gaq.push(['_trackPageview']);
+
+          (function() {
+            var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+            ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+            var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+          })();
+
+        </script>
+    </head>
+  
+    <body>
+        <div class="break">
+            <button onclick="window.location.href = '/main'" class="back-button"  value="Back">Back</button>
+        </div>
+        
+        <h1>Exporting tasks from Outlook</h1>
+        
+        <div class="break">
+            Jump to <a href="#FAQ">FAQ</a>
+        </div>
+        
+        <div class="big-break">
+            <div class="break">
+                There are two ways to export tasks from Outlook in a format suitable for importing into Google Tasks using <span class="command-highlight">Google Tasks Import</span>.
+                
+                <ol class="import-instructions" type="A">
+                <li>Using the <a href="#EOT_tool"><span class="command-highlight">Export Outlook Tasks</span> tool</a></li>
+                    <li>Using a custom <a href="#ExportTasksButton"><span class="command-highlight">[Export Tasks]</span> button</a> in Outlook</li>
+                </ol>
+            </div>
+                
+            <div class="break">
+                The end result from both methods is the same - a file that can be imported by Google Tasks Import. The primary differences are;
+                <table class="comparison" border="1" cellspacing="0" cellpadding="6px" >
+                    <thead>
+                        <tr>
+                            <th>Export Outlook Tasks tool</th>
+                            <th>Custom [Export Tasks] button in Outlook</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Program is run from the Start menu</td>
+                            <td>Button allows a user to export tasks directly from within Outlook</td>
+                        </tr>
+                        <tr>
+                            <td>Easy to install</td>
+                            <td>More complicated installation procedure</td>
+                        </tr>
+                        <tr>
+                            <td>Requires user to program installation privelege on PC</td>
+                            <td>Requires user to have access to the VBA environment in Outlook</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Provides more tasklist name import options
+                                <ul>
+                                    <li>Use category as tasklist name</li>
+                                    <li>Import all tasks into default tasklist</li>
+                                    <li>Import all tasks into user-specified tasklist name</li>
+                                    <li>Multiple options for specifying tasklist name if task has no categories</li>
+                                </ul>
+                            </td>
+                            <td>
+                                Limited tasklist name import options;
+                                <ul>
+                                    <li>Use category as tasklist name</li>
+                                    <li>Import all tasks into default tasklist</li>
+                                    <li>Import all tasks into tasklist named "Outlook"</li>
+                                </ul>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <hr>
+        
+        <a name="EOT_tool">
+        <h2>A. Exporting tasks using the <span class="command-highlight">Export Outlook Tasks</span> tool</h2>
+        </a>
+        
+        <div class="break">
+            <div class="break">
+                If the <span class="command-highlight">Export Outlook Tasks</span> tool has not been installed, <a href="#install_EOT_tool">follow these instructions</a>.
+            </div>
+            <ol>
+                <li>Outlook does not need to be running to export tasks using <span class="command-highlight">Export Outlook Tasks</span>
+                    <ul>
+                        <li>Due to a quirk in the interaction between <span class="command-highlight">Export Outlook Tasks</span> and Outlook, some windows may appear behind other windows. Minimising or closing Outlook before starting <span class="command-highlight">Export Outlook Tasks</span> <span class="italic">may</span> help.</li>
+                    </ul>
+                </li>
+                
+                <li>Start <span class="command-highlight">Export Outlook Tasks</span> from the start menu</li>
+                <li>Select the desired tasklist name options. This determines the tasklist name(s) to be used when the tasks are imported into Google Tasks.</li>
+                <li>Select which tasks to export. Only tasks with the selected status values will be exported.</li>
+                <li>Click <span class="command-highlight">[Choose tasks folder]</span>, then choose the tasks folder to export and click <span class="command-highlight">[OK]</span></li>
+                <li>The "Save As" window opens automatically</li>
+                <li>Choose the location to save the exported CSV file and click <span class="command-highlight">[Save]</span></li>
+                <li>
+                    Outlook may display a message such as
+                    <div  style="margin:6px 0 6px 24px;">
+                        <span class="command-highlight">A program is trying to access email addresses you have stored in Outlook. Do you want to allow this?</span>
+                    <ul>
+                        <li>
+                            This is a misleading message from Outlook, as Export Outlook Tasks is accessing Tasks not email addresses.
+                        </li>
+                    </ul>
+                    </div>
+                    Select
+                    <div  style="margin:6px 0 6px 24px;">
+                        <span class="command-highlight">Allow access for 1 minute</span>
+                    </div>
+                    and click <span class="command-highlight">[Yes]</span> to allow the export to continue.
+                </li>
+                <li>
+                    <span class="command-highlight">Export Outlook Tasks</span> starts retrieving tasks from Outlook and writes the tasks to the file chosen in the previous step.
+                    <ul>
+                        <li>The amount of time taken to export the tasks depends on how many tasks are in the select tasks folder, but should take less than one minute. The bottom of the <span class="command-highlight">Export Outlook Tasks</span> window displays when the export is complete.</li>
+                    </ul>
+                </li>
+                    
+                <li>
+                    A window will display when the export has completed, showing the file name of the exported file. For convenience, this filename is also copied to the clipboard so that it can easily be pasted in step 10.
+                </li>
+                <li>Go to the <a href="http://import-tasks.appspot.com">Google Tasks Import website</a></li>
+                <li>
+                    Choose the desired import method. The recommended import methods for Outook tasks are:
+                    <ul>
+                        <li>Append timestamp to tasklist name, or</li>
+                        <li>Append own suffix, or</li>
+                        <li>Replace tasklist contents</li>
+                    </ul>
+                    For more details of each method, click on the help icon next to each option on the website.
+                </li>
+                <li>
+                    Click on the file upload button. When the "Open file" window opens, you can paste the filename, or browse to the location where the file was saved.
+                    <ul>
+                        <li>The name of the file upload button varies from browser to browser. For example, Firefox and Internet Explorere use <span class="command-highlight">[Browse ...]</span>, whereas Chrome uses <span class="command-highlight">[Choose file]</span>
+                </li>
+            </ol>
+        </div>
+            </ol>
+        </div>
+        <hr>
+            
+        <a name="ExportTasksButton">
+        <h2>B. Exporting tasks using the custom <span class="command-highlight">[Export Tasks]</span> button in Outlook</h2>
+        </a>
+        
+        <div class="break">
+            <div class="break">
+                If the custom <span class="command-highlight">[Export Tasks]</span> button has not been installed in Outlook, <a href="#install_ExportTasksButton">follow the instructions below</a>.
+            </div>
+        
+            <ol class="import-instructions">
+                <li>From Outlook, Click the <span class="command-highlight">[Export Tasks]</span> button</li>
+                <li>Choose the Import Mode</li>
+                <li>Choose status values to be exported. This determines which tasks will be exported (e.g., only incomplete tasks)</li>
+                <li>Click on <span class="command-highlight">[Choose tasks folder]</span></li>
+                <li>
+                    Choose the tasks folder to be exported and click <span class="command-highlight">[OK]</span>
+                    <ul>
+                        <li>Note that the displayed list will show the default inbox highlighted. Scroll up or down to find the desired tasks folder</li>
+                    </ul>
+                </li>
+                <li>
+                    Choose a location to save the exported file and click <span class="command-highlight">[OK]</span>
+                    <ul>
+                        <li>The script will automatically create a unique file name which includes the name of the tasks folder, and today's date and time. For example "<span class="fixed-font">tasks_export My Work Tasks 2012-10-19 15-39-24.csv</span>"</li>
+                    </ul>
+                </li>
+                <li>
+                    A window will display when the export has completed, showing the file name of the exported file. For convenience, this filename is also copied to the clipboard so that it can easily be pasted in step 10.
+                </li>
+                <li>Go to the <a href="http://import-tasks.appspot.com">Google Tasks Import website</a></li>
+                <li>
+                    Choose the desired import method. The recommended import methods for Outook tasks are:
+                    <ul>
+                        <li>Append timestamp to tasklist name, or</li>
+                        <li>Append own suffix, or</li>
+                        <li>Replace tasklist contents</li>
+                    </ul>
+                    For more details of each method, click on the help icon next to each option on the website.
+                </li>
+                <li>Click on <span class="command-highlight">[Choose file]</span>. When the "Open file" window opens, you can paste the filename, or browse to the location where the file was saved</li>
+            </ol>
+        </div>
+        
+
+    <hr>
+    <hr>
+    <h1>Installation Instructions</h1>
+    <hr>
+    
+    <a name="install_EOT_tool">
+    <h2>Installing Export Outlook Tasks tool</h2>
+    </a>
+    
+    <div class="break">
+        <ol class="import-instructions">
+        
+            <li>
+                Extract the <span class="fixed-font">ExportOutlookTasks_Setup</span> folder from <a href="/static/ExportOutlookTasks_Setup.zip">ExportOutlookTasks_Setup.zip</a> to a suitable temporary location.
+                <ul>
+                    <li>If reinstalling, make sure that you extract to the same temporary folder location initially used. If you cannot remember the initial folder location, uninstall <span class="command-highlight">Export Outlook Tasks</span> tool before installing the new version.
+                    </li>
+                </ul>
+            </li>
+            <li>
+                Open the extracted folder and run <span class="command-highlight">setup</span>
+                <ul>
+                    <li>Do not attempt to run setup from within the Zip program, as the install may fail. Make sure that setup is run only from the extracted folder.
+                    </li>
+                </ul>
+            </li>
+            <li>Click <span class="command-highlight">[Install]</span>
+                <ul>
+                    <li>The installer will display <span class="command-highlight">Publisher cannot be verified</span> because, this project is unfunded, so there is no money to pay for a certificate.</li>
+                </ul>
+            </li>
+            <li>The installation will only take a few seconds. When it is complete, the <span class="command-highlight">Export Outlook Tasks</span> window opens.</li>
+            <li>The installation creates an entry for Export Outlook Tasks in <span class="command-highlight">Start > All Programs</span></li>
+        </ol>
+        
+        
+        
+        If you attempt to reinstall <span class="command-highlight">Export Outlook Tasks</span> from a different intall location, you may see the following error message;
+        <br />
+        <span class="command-highlight">You cannot start application Export Outlook Tasks from this location because it is already installed from a different location.</span>
+        <br />
+        In this case, just uninstall <span class="command-highlight">Export Outlook Tasks</span> first, using the standard Windows  program uninstall option in the Control Panel. 
+    </div>
+    
+    <hr>
+    
+    
+    <a name="install_ExportTasksButton">
+    <h2>Installing [Export Tasks] button on Outlook toolbar</h2>
+    </a>
+    
+    <div class="break">
+        These instructions are for Microsoft Outlook 2007. 
+        The code should work for other Outlook versions, but the setup instructions may differ.
+
+        <ol class="import-instructions">    
+            <li>
+                Extract the contents of the <a href="/static/ExportTasksFromOutlook.zip"><span class="fixed-font">ExportTasksFromOutlook.zip</span></a> file to a location where they will not be deleted, edited or moved.
+            </li>
+            <li>From Outlook, press <span class="command-highlight">Alt+F11</span> to open the Visual Basic Editor</li>
+                <ul>
+                    <li>NOTE: Steps 3 through 9 are all done from the Visual Basic Editor window</li>
+                </ul>
+            <li>Click on <span class="command-highlight">File &gt; Import file ...</span> and navigate to the location chosen in step 1</li>
+            <li>Select <span class="fixed-font">CListOfTasks.cls</span> and click <span class="command-highlight">[Open]</span></li>
+            <li>Repeat step 3 and open <span class="fixed-font">FormExportTasks.frm</span></li>
+            <li>
+                Click on <span class="command-highlight">Tools &gt; References</span> to open the "References - VBAProject" window and ensure that the following have all been selected:
+                <ul>
+                    <li><span class="fixed-font">Visual Basic for Applications</span></li>
+                    <li><span class="fixed-font">Microsoft Outlook vv.v Object Library</span> {where <span class="fixed-font">vv.v</span> is the highest version number}</li>
+                    <li><span class="fixed-font">Microsoft Scripting Runtime</span></li>
+                    <li><span class="fixed-font">Microsoft Forms 2.0 Object Library</span></li>
+                </ul>
+               It is OK if other references are selected as well   
+            </li>
+            <li>In the project map on the left hand side, under "Microsoft Office Outlook Objects", double click on <span class="fixed-font">ThisOutlookSession</span></li>
+            <li>
+                In the (General) workspace, on the right hand side, type (or paste) the following code
+<pre>
+Public Sub ExportTasksAsUnicode()
+    formExportTasks.Show
+End Sub
+</pre>
+            </li>
+            <li>Click <span class="command-highlight">File &gt; Save</span></li>
+            <li>Close the Visual Basic Editor window</li>
+            <li>On the main Outlook window, right-click anywhere on the toolbar, and choose <span class="command-highlight">Customize</span></li>
+            <li>On the Customize window, from the <span class="command-highlight">Commands</span> tab, choose the <span class="command-highlight">Macros</span> category</li>
+            <li>
+                Click and drag <span class="fixed-font">Vbaproject.ThisOutlookSession.ExportTasksAsUnicode</span> to a suitable location on the toolbar
+                <ul>
+                    <li>The first part of the name may sometimes appear as <span class="fixed-font">Project1</span> or similar
+                    <br />
+                    e.g., <span class="fixed-font">Project1.ThisOutlookSession.ExportTasksAsUnicode</span></li>
+                </ul>
+            </li>
+            <li>Right-click on the newly created button and select all the text in the <span class="command-highlight">Name:</span> field and replace it with &nbsp; <span class="fixed-font">Export Tasks</span></li>
+                <ul>
+                    <li>You can also choose a suitable icon with the <span class="command-highlight">Change button image ></span> option.<br />
+                    I chose the floppy disk with the arrow pointing out.</li>
+                </ul>
+            <li>Close the Customize window</li>
+            <li>Exit Outlook</li>
+            <li>Restart Outlook</li>
+        </ol>    
+            
+        <div class="break">
+            When Outlook restarts, and/or when the <span class="command-highlight">[Export Tasks]</span> button is clicked, Outlook may display a warning message.
+            <ul class="sub-instructions">
+                <li>
+                    Newer versions of Outlook may display <span class="command-highlight">Microsoft Office has identified potential security concerns</span>
+                </li>
+                <li>
+                    Older versions of Outlook may display <span class="command-highlight">'ThisOutlookSession' contains macros.</span>
+                </li>
+            </ul>
+            <div style="margin:1.8em" class="medium-break">
+                If you see this warning, Click <span class="command-highlight">[Enable Macros]</span>
+            </div>
+        </div>
+
+        <div class="break">
+            If nothing happens when the <span class="command-highlight">[Export Tasks]</span> button is clicked, that is probably due to Outlook's Macro Security settings. There are two solutions;
+            <ol class="import-instructions" type="a">
+                <li>
+                    Reduce security limitations to allow macros to run
+                    <ul>
+                        <li>This option is easier, but does slightly reduce security. Follow steps <a href="#option_a">101 through 106</a>.</li>
+                    </ul>
+                </li>
+                
+                <li>
+                    Create a self-signed digital certificate
+                    <ul>
+                        <li>This option is recommended to maintain security. Follow steps <a href="#option_b">201 through 215</a>.</li>
+                    </ul>
+                </li>
+            </ol>        
+        </div>
+        
+        
+        <hr>        
+
+
+        <div class="break">
+            <a name="option_a">
+            <h4>Option (a) - Reduce security limitations to allow macros to run</h4>
+            </a>
+            <ol  class="import-instructions" start="101">
+                <li>Open the Macro Security setting from <span class="command-highlight">Tools &gt; Macro &gt; Security</span> ...</li>
+                <li>
+                    Ensure that Macro Security is set for <span class="command-highlight">Warnings for all macros</span>
+                    <ul>
+                        <li>In older versions of Outlook, the options are High, Medium or Low. Choose <span class="command-highlight">Medium</span></li>
+                    </ul>
+                </li>
+                
+                <li>
+                    Exit Outlook
+                    <ul>
+                        <li>Click <span class="command-highlight">[Yes]</span> if prompted "Do you want to save the VBA project 'VbaProject.OTM'?</li>
+                    </ul>
+                </li>
+                <li>Restart Outlook</li>
+                <li>
+                    When Outlook restarts, and/or when the <span class="command-highlight">[Export Tasks]</span> button is clicked, Outlook will display a warning message.
+                    <ul>
+                        <li>
+                            Newer versions of Outlook will display <span class="command-highlight">Microsoft Office has identified potential security concerns</span>
+                        </li>
+                        <li>
+                            Older versions of Outlook will display <span class="command-highlight">'ThisOutlookSession' contains macros.</span></li>
+                    </ul>
+                </li>
+                <li>
+                    Click <span class="command-highlight">[Enable Macros]</span>
+                </li>
+            </ol>
+            <span class="command-highlight">[Export Tasks]</span> should now work. You may be prompted to click the <span class="command-highlight">[Enable Macros]</span> button every time that you restart Outlook, and/or the first time that you click the <span class="command-highlight">[Export Tasks]</span> button.
+        </div>
+        
+        <hr>
+
+        <div class="break">
+            <a name="option_b">
+            <h4>Option (b) - Create a self-signed digital certificate</h4>
+            </a>
+            <ol  class="import-instructions" start="201">
+                <li>Go to <span class="command-highlight">Start &gt; All programs &gt; Micosoft Office &gt; Microsoft Office Tools &gt; Digital Certificate for VBA Projects</span></li>
+                <li>Create a self-signed digital certificate with a suitable name such as "My VBA Certificate"</li>
+                <li>From Outlook, press <span class="command-highlight">Alt+F11</span> to open the Visual Basic Editor</li>
+                <li>Click on <span class="command-highlight">Tools &gt; Digital Signature</span></li>
+                <li>Click <span class="command-highlight">[Choose]</span> and click on the certificate created in step 202, then click <span class="command-highlight">[OK]</span> and <span class="command-highlight">[OK]</span> again</li>
+                <li>Click on <span class="command-highlight">File &gt; Save VbaProject.OTM</span></li>
+                <li>Close the Visual Basic Editor window</li>
+                <li>On the main Outlook window, click on <span class="command-highlight">Tools &gt; Macro &gt; Security ...</span></li>
+                <li>Ensure that Macro Security is set for <span class="command-highlight">Warnings for signed macros; all unsigned macros are disabled</span></li>
+                <li>Exit Outlook</li>
+                <li>Click <span class="command-highlight">[Yes]</span> when prompted "Do you want to save the VBA project 'VbaProject.OTM'?</li>
+                <li>Restart Outlook</li>
+                <li>On the "Microsoft Office Outlook Security Notice" window, there should be warning stating that the publisher has not been authenticated for ThisOutlookSession.</li>
+                <li>Click on <span class="command-highlight">Show Signature Details</span> to confirm that the name is the same as set in step step 202 and click [OK]</li>
+                <li>Click <span class="command-highlight">[Trust all documents from this publisher]</span></li>
+            </ol>
+        </div>
+
+
+        <span class="command-highlight">Please report any problems at <a href="http://code.google.com/p/import-tasks/issues/list">code.google.com/p/import-tasks/issues/list</a></span>
+        
+    </div>
+    
+    
+    <hr>
+    <hr>
+    
+    <a name="FAQ">
+    <h1>FAQ</h1>
+    </a>
+    
+    <hr>
+    
+    <div class="faq big-break">
+        <h2>Why is a separate program or script required?</h2>
+        <div class="break">
+            It was necessary to create a script or program that runs on the user's PC, because the export file from Outlook often cannot be reliably imported by other applications. There are 3 major issues which prevent a web application being able to reliably import tasks directly exported from Outlook; very poor support for non-English characters, ambiguous date formatting, and column names that vary by locale.
+        </div>
+        <div class="description">
+            <h4>File format</h4>
+            <div>
+                Outlook exports tasks in Windows ANSI format. Windows ANSI relies on codepages to handle non-ASCII extended and interantional characters. In order to be able to interpret the contents of a Windows ANSI file, the reader must know which code page was used when the file was written. Unfortunately, the file does not indicate which code page was used. Without that information, the file can only be correctly interpreted on a machine using exactly the same code page as the machine that created the file (i.e., people in the same locale). Since AppEngine has no way to know which code page was used, it cannot not process files with any non-ASCII text (i.e., extended or international characters).
+            </div>
+            <div>
+                Another limitation of the Windows ANSI format is that it can support only one extended character set in any given file. So, even if we knew what code page had been used, if a user had used more than one language or extended character set, the text for one of those languages would be displayed as garbage anyway.
+            </div>
+            <h4>Date format</h4>
+            <div>
+                Another problem with the Outlook tasks export file is that the date is stored according to the settings on the user's PC, which varies by locale, but can also be set to a custom format by the user. This makes it very difficult for a third-party to determine what the intended date was. For example, in the U.S.A, <span class="fixed-font">3/8/2012</span> would be interpretted as <span class="fixed-font">8 March 2012</span>, however in many other regions such as Europe and Australia, this would be interpretted as <span class="fixed-font">3 August 2012</span>. There are many other date formats used worlwide, including some that use characters between values rather than symbols. See <a href="http://en.wikipedia.org/wiki/Date_format_by_country#Listing">http://en.wikipedia.org/wiki/Date_format_by_country</a> for an idea of the variability of date formats.
+            </div>
+            <h4>International column names</h4>
+            <div>
+                In many countries, Outlook exports column names that correspond to the locale the user is in. For example, in German Outlook, <span class="fixed-font">"Subject"</span> is exported as <span class="fixed-font">"Betreff"</span> 
+            </div>
+        </div>
+        <h4>The solution</h4>
+        <div class="break">
+            The program or VBA scrip handles all these issues by using the column names expected by Google Tasks Import, by exporting dates in an unambiguous format, and then using the UTF-8 file format (which handles all extended and international characters). The program is able to correctly interpret the tasks data, because it is running on the user's PC and can query Outlook directly, thus avoiding having to try to interpret ambiguous data.
+        </div>
+        
+        <h2>How does the program work?</h2>
+        <div>
+            The program queries Outlook, and retrieves all the tasks from the chosen tasklist.
+            The program then exports the file as a UTF-8 standard file with unambigous date format, which maintains all extended and international characters, and ensures that dates are correctly interpretted, irrespective of the user's own date format.
+            <ul>
+                <li>
+                    When the program is started, the user can choose which tasklist(s) the Outlook tasks will be assigned to, and which tasks to export, by selecting any combination of the five possible Outlook task status values
+                </li>
+                <li>
+                    Once these options have been configures, click on [Choose tasks folder]
+                </li>
+                <li>
+                    Outlook will present a windows from which you can select which tasklist you wish to export
+                </li>
+                <li>
+                    Next, select the file name and folder where the tasks will be exported to
+                </li>
+                <li>
+                    Once the file has been created, it can be imported into Google Tasks using this website
+                </li>
+            </ul>
+        </div>
+        
+    </div>
+        
+        
+    </body>
+</html>

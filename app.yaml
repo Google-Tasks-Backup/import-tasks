@@ -1,22 +1,42 @@
 
-# ===== Limited Public Test host and version ======
-application: import-tasks
-version: 1
+# version becomes sub-domain of application
+#   i.e., VERSION.APP-ID.appspot.com
+# Default version is set via admin console
 
-# ===== Private Alpha Test host and version ======
+# When testing, only use Major and Minor (e.g., 'test-gti-0-4')
+#   Where 0 is the Major and 4 is the Minor
+# When going live, use the full version number (e.g., 'gti-0-4-304')
+#   Where 0 is the Major, 4 is the Minor and 304 is the Revision
+version: gti-0-6-003
+#version: test-gti-0-6
+
+# ===== Production server ======
+application: import-tasks
+
+# ===== Test server ======
+#application: tasks-import
+
+# ===== Private Alpha Test host ======
 #application: js-tasks-test
-#version: 1
 
 # ===== Local host ==========
 #application: import-tasks-local
-#version: 1
 
-runtime: python
+threadsafe: false
+runtime: python27
 api_version: 1
 
-# Static files remain cached by the browser for 12 hours
-default_expiration: "12h"
+# Force static files to remain cached by the browser for 5 minutes
+# This is so that potentially updated versions of install files will
+# be available to the user ASAP, whilst still allowing most users
+# to have all static content cached, as most users will use the
+# website for less than 5 minutes.
+default_expiration: "5m"
 
+libraries:
+- name: django
+  version: "1.2"
+  
 
 error_handlers:
   - file: error_handlers/error_default.html
@@ -48,28 +68,29 @@ handlers:
   secure: always
   
 - url: /worker
-  script: worker.py
+  script: worker.app
   login: admin
   secure: always
 
 - url: /admin/.*
-  script: import_tasks.py
+  script: admin.app
   login: admin
   secure: always
 
 # Main page does not require login, so that anyone can read main page before authorising
 - url: /
-  script: import_tasks.py
+  script: import_tasks.app
   secure: always
 
-# Subsequent pages require user to be logged in
+# robots.txt is handled programmatically, because we want to return "disallow all"
+# for test servers, but allow robots on the production server.
+- url: /robots.txt
+  script: import_tasks.app
+  secure: optional
+
+# All other pages require user to be logged in
 - url: /.+
-  script: import_tasks.py
+  script: import_tasks.app
   login: required
   secure: always
 
-# ============================
-# For debug on localhost
-# ============================
-#- url: /oauth2callback
-#  script: oauth2client/appengine.py

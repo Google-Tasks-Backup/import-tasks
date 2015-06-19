@@ -1,0 +1,30 @@
+                            <img class="popupTrigger" id="help-DELETE_BEFORE_IMPORT" src="/static/help.png" alt="Display help">
+                            <img class="popupTrigger" id="help-DELETE_BEFORE_IMPORT" src="/static/warning.png" alt="Display warning">
+                            <div class="popupContent" id="help-DELETE_BEFORE_IMPORT-content">
+                                <img class="popupClose" src="/static/close.png" alt="Close">
+                                <img src="/static/warning_32.png" alt="Display warning">
+                                <ul class="clear">
+                                    <li>
+                                        <span style="color:red;">WARNING:</span> Choosing this option means that ALL existing tasklists (and their contents) will be deleted!
+                                    </li>
+                                    <ul>
+                                        <li>
+                                            <span style="color:orange;">NOTE:</span> Google does not allow the default tasklist to be deleted.
+                                            The default tasklist is usually named <span class="fixed-font smaller-font">"Default List"</span> or
+                                            <span class="fixed-font smaller-font">"My&nbsp;&lt;AccountName&gt;&nbsp;list"</span>, 
+                                            but can have any name. It is not necessarily the first tasklist in the list of tasklists. 
+                                        </li>
+                                        <li>
+                                            The contents of the default tasklist will not be modified or deleted.
+                                        </li>
+                                        <li>
+                                            {{ app_title }} will try to retain the original name of the default tasklist. However, if a new tasklist is created with the same name as the original default tasklist, the default tasklist will be renamed as 
+                                            <span class="fixed-font smaller-font">"Undeletable&nbsp;default&nbsp;nnnnnnnnnn"</span>
+                                            (where <span class="fixed-font smaller-font">nnnnnnnnnn</span> is a unique number)
+                                        </li>
+                                    </ul>
+                                    <li>
+                                        For each tasklist in the imported data, a new tasklist is created containing only the imported tasks.
+                                    </li>
+                                </ul>
+                            </div>

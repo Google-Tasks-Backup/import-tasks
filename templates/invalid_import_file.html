@@ -1,0 +1,205 @@
+{% comment %}
+Copyright 2012 Julie Smith.  All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+This is the Django template for displaying messages to the user.
+
+Note that msg1, msg2 and msg3 are marked as 'safe' so that the calling code can embed HTML
+
+{% endcomment %}
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC
+  "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+  <head>
+    <title>{{ app_title }}</title>
+    <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <script type="text/javascript" src="/static/jquery.js"></script>
+        <script type="text/javascript" src="/static/popup.js"></script>
+    <script type="text/javascript">
+        // Copyright 2001 Idocs.com      
+        // Distribute this script freely, but keep this notice in place
+
+        // backlink object initializer
+        function backlink() {
+            this.text = 'Go Back';
+            this.type = 'link';
+            this.write = backlink_write;
+            this.form = true;
+        }
+
+
+        // write method
+        function backlink_write() {
+            if (! window.history) return;
+            if (window.history.length == 0)return;
+
+            this.type = this.type.toLowerCase();
+            if (this.type == 'button') {
+                if (this.form)
+                    document.write('<form>');
+                document.write('<input type=button onClick="history.back(-1)" value="', this.text, '"');
+                if (this.otheratts) document.write(' ', this.otheratts);
+                document.write('>');
+                if (this.form)document.write('<\/form>');
+            } else {
+                document.write('<a href="javascript:history.back(-1)"');
+                if (this.otheratts)
+                    document.write(' ', this.otheratts);
+                document.write('>');
+                if (this.type == 'image' || this.type == 'img') {
+                    document.write('<img src="', this.src, '" alt="', this.text, '"');
+                    if (this.width) document.write(' width=', this.width);
+                    if (this.height) document.write(' height=', this.height);
+                    if (this.otherimgatts) document.write(' ', this.otherimgatts);
+                    document.write(' border=0 />');
+                }
+                else
+                    document.write(this.text);
+                document.write('<\/a>');
+            }
+        }        
+
+        {% if show_back_button %}
+            var gb = new backlink();
+            gb.text = "{{ back_button_text }}";
+            gb.type = "button";
+            gb.otheratts = 'class="back-button"';
+            gb.write();
+        {% endif %}
+    </script>
+    {% include "inc_google_analytics.html" %}
+  </head>
+  
+  <body>
+  
+    {% if show_custom_button %}
+        <form>
+            <input type="button" class="back-button" onClick="window.location.href = '{{ custom_button_url }}'" 
+                value="{{ custom_button_text }}">
+        </form>
+    {% endif %}
+
+    {% if show_heading_messages %}
+        <h2>{{ app_title }}</h2>
+    {% endif %}
+  
+    <noscript>
+        <br />
+        <h3>Javascript must be enabled to use this site</h3>
+        <br />
+    </noscript>
+    
+    {% if host_msg and show_heading_messages %}
+        <div class="break">
+        <h3>{{ host_msg }}</h3>
+        </div>
+    {% endif %}
+    
+    <br />
+    <br />
+
+    {% if file_name %}
+        <div class="break">
+            File name: {{ file_name }}
+        </div>
+    {% endif %}
+
+    <div class="break take-note-larger">
+        {{ msg1|safe }}
+    </div>
+    
+    
+    {% if msg2 %}
+        <div class="break take-note">
+            {{ msg2|safe }}
+        </div>
+    {% endif %}
+
+    {% if msg3 %}
+        <div class="break">
+            {{ msg3|safe }}
+        </div>
+    {% endif %}
+    
+    <div class="break">
+        <hr>
+    </div>
+
+    <div class="small-break">
+        {{ app_title }} can import tasks from 2 different <a href="http://{{ url_GTB }}">Google Tasks Backup</a> formats; 
+        <span class="take-note">Import/Export GTBak</span> and <span class="take-note">Import/Export CSV</span>
+        <sup><a class="popupTrigger" id="help-CSV_DESCRIPTION" href="#note1">1</a></sup>.
+        <div class="popupContent" id="help-CSV_DESCRIPTION-content">
+            <img class="popupClose" src="/static/close.png" alt="Close">
+            <div class="clear">
+            
+                For details of the CSV import file format, refer to the <a href="/static/info.html#import_export_csv">information page</a>.
+            </div>
+            <div class="medium-break">
+                The CSV format may not support all international or extended characters, but may be edited by a text editor such as
+                <a href="http://notepad-plus-plus.org/">Notepad++</a> using UTF-8 encoding (without BOM). 
+            </div>
+            <div class="comment medium-break">
+                It is not recommended to edit the CSV file with a spreadsheet program, as programs such as Excel and OpenOffice Calc tend to corrupt the data.
+            </div>
+        </div>
+     
+        <br />
+        <span class="comment">The <span class="take-note">GTBak format is recommended</span>, especially if your tasks contain international or extended characters. </span>
+    </div>
+    
+    <div class="break">
+        {{ app_title }} does not support import from Outlook CSV files<sup>
+        <a class="popupTrigger" id="help-OUTLOOK_NOT_SUPPORTED" href="#note2">2</a></sup>, however you can download <span class="fixed-font">{{ eot_executable_name }}</span> to export tasks from Outlook in a format that can be imported by {{ app_title }}. <a href="{{ outlook_instructions_url }}">Instructions for importing from Outlook</a>
+    </div>
+    <div class="popupContent" id="help-OUTLOOK_NOT_SUPPORTED-content">
+        <img class="popupClose" src="/static/close.png" alt="Close">
+        <div class="clear">
+            The export file from Outlook cannot be reliably imported, because;
+            <ul>
+                <li>Outlook uses Microsoft ANSI encoding, which has very poor support for non-English characters, meaning that International and extended characters cannot be interpretted correctly</li>
+                <li>Outlook's date formatting depends on locale, resulting in ambiguous date formatting</li>
+                <li>Column names vary by locale, so cannot be reliably interpretted</li>
+            </ul>
+        </div>
+        <div class="medium-break">
+            For more details, and for instructions on exporting data from Outlook that can be imported, refer to the <a href="{{ outlook_instructions_url }}">instructions for exporting tasks from Outlook</a>
+        </div>
+    </div>
+    
+    <div class="break">
+        For full details of the CSV import file format, refer to the <a href="/static/info.html#import_export_csv">information page</a>.
+        The CSV format may not support all international or extended characters, but may be edited by a text editor such as
+        <a href="http://notepad-plus-plus.org/">Notepad++</a> before being imported. 
+        <div class="comment">
+            It is not recommended to edit the CSV file with a spreadsheet program, as programs such as Excel and OpenOffice Calc tend to corrupt the data.
+        </div>
+    </div>
+    
+    <form>
+        <input type="button" class="big-button" onClick="window.location.href = '{{ url_main_page }}'" 
+            value="Return to main page">
+    </form>
+    
+    {% include "inc_project_footer.html" %}
+    
+
+	<div class="backgroundPopup"></div>
+
+  </body>
+</html>

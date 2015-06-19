@@ -1,0 +1,46 @@
+{% comment %}
+Copyright 2012 Julie Smith.  All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+
+This Django template dumps the stats as a CSV file.
+
+Available fields:
+    user_hash  = db.IntegerProperty(indexed=True) # hash(user_email)
+    
+    # Datestamp indicating when the import job was initially started
+    job_start_timestamp = db.DateTimeProperty(indexed=True) # from ImportTasksJob.job_start_timestamp
+    
+    # Number of tasks imported
+    number_of_tasks = db.IntegerProperty(indexed=False)
+    
+    # Number of tasklists imported
+    number_of_tasklists = db.IntegerProperty(indexed=False)
+    
+    # The cumulative amount of time spent running worker.py to processing this job.
+    # This has to be cumulative, because an import job may span more than one run of worker.py, and runs
+    # may have an unknown amount of non-processing time between runs (e.g., if a user later continues a paused job,
+    # or there are other jobs in the taskqueue)
+    total_processing_seconds = db.FloatProperty(indexed=False) # from ImportTasksJob.total_processing_seconds
+    
+    # Type of uploaded file. Only csv and gtbak are supported
+    file_type = db.StringProperty(indexed=False, default=None) # from ImportTasksJob.file_type
+
+
+Use
+    ="{{ stat.user_hash }}"
+so that Excel doesn't interpret the hash as a number and truncate it as a 6-digit exponential number.    
+
+{% endcomment %}{% autoescape off %}"User hash","Start time (UTC)","Number of tasks","Number of tasklists","Processing time (seconds)","File type"{% for stat in stats %}
+="{{ stat.user_hash }}","{{ stat.job_start_timestamp|date:"Y-m-d H:i:s" }}",{{ stat.number_of_tasks }},{{ stat.number_of_tasklists }},{{ stat.total_processing_seconds }},{{ stat.file_type }}{% endfor %}{% endautoescape %}
