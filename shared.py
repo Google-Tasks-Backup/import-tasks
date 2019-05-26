@@ -18,45 +18,23 @@
 # This module contains code whis is common between classes, modules or related projects
 # Can't use the name common, because there is already a module named common
 
-
-# Fix for DeadlineExceeded, because "Pre-Call Hooks to UrlFetch Not Working"
-#     Based on code from https://groups.google.com/forum/#!msg/google-appengine/OANTefJvn0A/uRKKHnCKr7QJ
-from google.appengine.api import urlfetch
-real_fetch = urlfetch.fetch
-def fetch_with_deadline(url, *args, **argv):
-    argv['deadline'] = settings.URL_FETCH_TIMEOUT
-    return real_fetch(url, *args, **argv)
-urlfetch.fetch = fetch_with_deadline
-
-import webapp2
-
-from oauth2client import appengine
-from google.appengine.api import users
-from google.appengine.api import logservice # To flush logs
-from google.appengine.ext import db
-from google.appengine.api import memcache
-from google.appengine.ext.webapp import template
-
-from oauth2client import client
-from apiclient import discovery
-
-# Import from error so that we can process HttpError
-from apiclient import errors as apiclient_errors
-from google.appengine.api import urlfetch_errors
-
-import httplib2
-import Cookie
-import cgi
 import sys
 import os
-import traceback
 import logging
-import pickle
-import time
+import traceback
+import Cookie
+import cgi
+
+
+from google.appengine.api import urlfetch
+from google.appengine.api import logservice # To flush logs
+from google.appengine.api import mail
+from google.appengine.api.app_identity import get_application_id
+from google.appengine.ext.webapp import template
+
 
 
 # Project-specific imports
-import model
 import settings
 import constants
 import appversion # appversion.version is set before the upload process to keep the version number consistent
@@ -68,22 +46,32 @@ logservice.AUTOFLUSH_EVERY_BYTES = None
 logservice.AUTOFLUSH_EVERY_LINES = 5
 logservice.AUTOFLUSH_ENABLED = True
 
+# Fix for DeadlineExceeded, because "Pre-Call Hooks to UrlFetch Not Working"
+#     Based on code from https://groups.google.com/forum/#!msg/google-appengine/OANTefJvn0A/uRKKHnCKr7QJ
+real_fetch = urlfetch.fetch # pylint: disable=invalid-name
+def fetch_with_deadline(url, *args, **argv):
+    argv['deadline'] = settings.URL_FETCH_TIMEOUT
+    return real_fetch(url, *args, **argv)
+urlfetch.fetch = fetch_with_deadline
+
+
 class DailyLimitExceededError(Exception):
     """ Thrown by get_credentials() when HttpError indicates that daily limit has been exceeded """
     
     msg = "Daily limit exceeded. Please try again after midnight Pacific Standard Time."
     
-    def __init__(self, msg = None):
+    def __init__(self, msg = None): # pylint: disable=super-init-not-called
         if msg:
             self.msg = msg
             
     def __repr__(self):
-        return msg;
+        return repr(self.msg)
     
 
-def set_cookie(res, key, value='', max_age=None,
-                   path='/', domain=None, secure=None, httponly=False,
-                   version=None, comment=None):
+def set_cookie( # pylint: disable=too-many-arguments
+               res, key, value='', max_age=None,
+               path='/', domain=None, secure=None, httponly=False,
+               version=None, comment=None):
     """
     Set (add) a cookie for the response
     """
@@ -116,27 +104,27 @@ def delete_cookie(res, key):
     set_cookie(res, key, '', -1)
     
   
-def format_exception_info(maxTBlevel=5):
+def format_exception_info(max_tb_level=5):
     cla, exc, trbk = sys.exc_info()
-    excName = cla.__name__
+    exc_name = cla.__name__
     try:
-        excArgs = exc.__dict__["args"]
+        exc_args = exc.__dict__["args"]
     except KeyError:
-        excArgs = "<no args>"
-    excTb = traceback.format_tb(trbk, maxTBlevel)
-    return (excName, excArgs, excTb)
+        exc_args = "<no args>"
+    exc_tb = traceback.format_tb(trbk, max_tb_level)
+    return (exc_name, exc_args, exc_tb)
          
 
 def get_exception_name():
-    cla, exc, trbk = sys.exc_info()
-    excName = cla.__name__
-    return str(excName)
+    cla, _, _ = sys.exc_info()
+    exc_name = cla.__name__
+    return str(exc_name)
          
 
 # def get_exception_msg(msg):
     # cla, exc, trbk = sys.exc_info()
-    # excName = cla.__name__
-    # return str(excName) + ": " + str(msg)
+    # exc_name = cla.__name__
+    # return str(exc_name) + ": " + str(msg)
   
 def get_exception_msg(e = None):
     """ Return string containing exception type and message
@@ -150,38 +138,47 @@ def get_exception_msg(e = None):
         If e is not specified, or cannot be parsed, "Type: Msg" is
         returned for the most recent exception
     """
+    
+    line_num = u''
+    msg = u''
+    ex_msg = u"No exception occured"
         
     # Store current exception msg, in case building msg for e causes an exception
     cla, exc, trbk = sys.exc_info()
+    try:
+        line_num = trbk.tb_lineno
+    except: # pylint: disable=bare-except
+        pass
     if cla:
-        excName = cla.__name__
-        ex_msg = unicode(excName) + ": " + unicode(exc.message)
-    else:
-        ex_msg = "No exception occured"
+        exc_name = cla.__name__
+        if line_num:
+            ex_msg = u"{}: {} at line {}".format(exc_name, exc.message, line_num)
+        else:
+            ex_msg = u"{}: {}".format(exc_name, exc.message)
     
     if e:
-        msg = ''
         try:
-            msg = unicode(e)
-            excName = e.__class__.__name__
+            e_msg = unicode(e)
+            exc_name = e.__class__.__name__
             
-            return str(excName) + ": " + msg
+            msg = u"{}: {}".format(exc_name, e_msg)
             
-        except Exception, e1:
+        except: # pylint: disable=bare-except
             # Unable to parse passed-in exception 'e', so returning the most recent
             # exception when this method was called
-            return "Most recent exception = " + ex_msg + " (" + msg + ")"
-            
-    else:
-         return ex_msg           
+            msg = u"Unable to process 'e'. Most recent exception = " + ex_msg
 
+    if msg:
+        return msg
+    return ex_msg
+        
          
 def is_test_user(user_email):
     """ Returns True if user_email is one of the defined settings.TEST_ACCOUNTS 
   
         Used when testing to ensure that only test user's details and sensitive data are logged.
     """
-    return (user_email.lower() in (email.lower() for email in settings.TEST_ACCOUNTS))
+    return user_email.lower() in (email.lower() for email in settings.TEST_ACCOUNTS)
   
 
 def dump_obj(obj):
@@ -209,7 +206,7 @@ def serve_quota_exceeded_page(self):
     serve_message_page(self, msg1, msg2, msg3)
     
     
-def serve_message_page(self, 
+def serve_message_page(self, # pylint: disable=too-many-arguments,too-many-locals 
         msg1, msg2 = None, msg3 = None, 
         show_back_button=False, 
         back_button_text="Back to previous page",
@@ -278,27 +275,45 @@ def serve_message_page(self,
         self.response.out.write(template.render(path, template_values))
         logging.debug(fn_name + "<End>" )
         logservice.flush()
-    except Exception, e:
+    except Exception, e: # pylint: disable=broad-except
         logging.exception(fn_name + "Caught top-level exception")
         serve_outer_exception_message(self, e)
         logging.debug(fn_name + "<End> due to exception" )
         logservice.flush()
     
 
-def serve_outer_exception_message(self, e):
+def serve_outer_exception_message(self, ex):
     """ Display an Oops message when something goes very wrong. 
     
         This is called from the outer exception handler of major methods (such as get/post handlers)
     """
     fn_name = "serve_outer_exception_message: "
     
-    self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br /><br />This system is in beta, and is being activeley developed.<br />Please report any errors to <a href="http://%s">%s</a> so that they can be fixed. Thank you.""" % 
-        ( get_exception_msg(e), settings.url_issues_page, settings.url_issues_page))
+    # self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br /><br />This system is in beta, and is being activeley developed.<br />Please report any errors to <a href="http://%s">%s</a> so that they can be fixed. Thank you.""" % 
+        # ( get_exception_msg(ex), settings.url_issues_page, settings.url_issues_page))
         
+    self.response.out.write("""
+        Oops! Something went terribly wrong:<br />
+        {exception_msg}<br />
+        <br />
+        Please report this error
+        <ul>
+            <li>via Github at <a href="http://{url_issues_page}">{url_issues_page}</a></li>
+            <li>or via the discussion group at <a href="http://{url_discussion_group}">{url_discussion_group}</a></li> 
+            <li>or via email to <a href="mailto:{email_discussion_group}">{email_discussion_group}</a></li>
+        </ul>
+        so that it can be fixed. Thank you.
+            """.format(
+                    exception_msg=get_exception_msg(ex),
+                    url_issues_page=settings.url_issues_page,
+                    url_discussion_group=settings.url_discussion_group,
+                    email_discussion_group=settings.email_discussion_group))
         
-    logging.error(fn_name + get_exception_msg(e))
+    logging.error(fn_name + get_exception_msg(ex))
     logservice.flush()
     
+    send_email_to_support("Served outer exception message", get_exception_msg(ex))
+        
     
 def reject_non_test_user(self):
     fn_name = "reject_non_test_user: "
@@ -318,4 +333,36 @@ def reject_non_test_user(self):
         show_heading_messages=False)
                     
                     
-                    
+def send_email_to_support(subject, msg):
+    fn_name = "send_email_to_support: "
+    
+    try:
+        # TODO: Add date & time (or some random, unique ID) to subject so each subject is unique,
+        # so that Gmail doesn't put them all in one conversation
+        subject = u"{} v{} ({}) - ERROR - {}".format(
+            host_settings.APP_TITLE,
+            appversion.version,
+            appversion.app_yaml_version,
+            subject)
+        
+        if not settings.SUPPORT_EMAIL_ADDRESS:
+            logging.info(fn_name + "No support email address, so email not sent:")
+            logging.info(fn_name + "    Subject = {}".format(subject))
+            logging.info(fn_name + "    Msg = {}".format(msg))
+            return
+            
+        logging.info(fn_name + "Sending support email:")
+        logging.info(fn_name + "    Subject = {}".format(subject))
+        logging.info(fn_name + "    Msg = {}".format(msg))
+        
+        sender = host_settings.APP_TITLE + " <noreply@" + get_application_id() + ".appspotmail.com>"
+        
+        mail.send_mail(sender=sender,
+            to=settings.SUPPORT_EMAIL_ADDRESS,
+            subject=subject,
+            body=msg)
+    
+    except: # pylint: disable=bare-except
+        logging.exception(fn_name + "Error sending support email")
+        # logging.info(fn_name + "    Subject = {}".format(subject))
+        # logging.info(fn_name + "    Msg = {}".format(msg))

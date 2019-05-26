@@ -16,42 +16,38 @@
 # Code that is common between import_tasks.py & worker.py
 
 import logging
+import datetime
+import json
 
-
-# Fix for DeadlineExceeded, because "Pre-Call Hooks to UrlFetch Not Working"
-#     Based on code from https://groups.google.com/forum/#!msg/google-appengine/OANTefJvn0A/uRKKHnCKr7QJ
 from google.appengine.api import urlfetch
-real_fetch = urlfetch.fetch
-def fetch_with_deadline(url, *args, **argv):
-    argv['deadline'] = settings.URL_FETCH_TIMEOUT
-    logging.debug("DEBUG: import_tasks_shared.fetch_with_deadline(): deadline = " + str(settings.URL_FETCH_TIMEOUT))
-    logservice.flush()
-    return real_fetch(url, *args, **argv)
-urlfetch.fetch = fetch_with_deadline
-
-
-
 from google.appengine.api import logservice # To flush logs
-from google.appengine.ext import blobstore
-from google.appengine.ext.webapp import blobstore_handlers
 
 # Import from error so that we can process HttpError
 from apiclient import errors as apiclient_errors
-from google.appengine.api import urlfetch_errors
-
-logservice.AUTOFLUSH_EVERY_SECONDS = 5
-logservice.AUTOFLUSH_EVERY_BYTES = None
-logservice.AUTOFLUSH_EVERY_LINES = 5
-logservice.AUTOFLUSH_ENABLED = True
 
 import unicodecsv
-import datetime
 
 # Project-specific setting
 import settings
 import host_settings
 import shared
 import constants
+
+logservice.AUTOFLUSH_EVERY_SECONDS = 5
+logservice.AUTOFLUSH_EVERY_BYTES = None
+logservice.AUTOFLUSH_EVERY_LINES = 5
+logservice.AUTOFLUSH_ENABLED = True
+
+
+# Fix for DeadlineExceeded, because "Pre-Call Hooks to UrlFetch Not Working"
+#     Based on code from https://groups.google.com/forum/#!msg/google-appengine/OANTefJvn0A/uRKKHnCKr7QJ
+real_fetch = urlfetch.fetch # pylint: disable=invalid-name
+def fetch_with_deadline(url, *args, **argv):
+    argv['deadline'] = settings.URL_FETCH_TIMEOUT
+    logging.debug("DEBUG: import_tasks_shared.fetch_with_deadline(): deadline = " + str(settings.URL_FETCH_TIMEOUT))
+    logservice.flush()
+    return real_fetch(url, *args, **argv)
+urlfetch.fetch = fetch_with_deadline
 
 
 def serve_invalid_file_format_page(self, file_name, *args, **kwargs):
@@ -77,14 +73,14 @@ def parse_datetime_string(datetime_string, timestamp_formats):
        Returns None if the string cannot be parsed using any of the supplied formats.
     """
     
-    fn_name = "parse_datetime_string: "
+    # fn_name = "parse_datetime_string: " # Only used for debugging
 
-    t = None
+    parsed_dt = None
     for timestamp_format in timestamp_formats:
         try:
-            t = datetime.datetime.strptime(datetime_string, timestamp_format)
-            return t # Successfuly parsed the datetime string
-        except Exception, e:
+            parsed_dt = datetime.datetime.strptime(datetime_string, timestamp_format)
+            return parsed_dt # Successfuly parsed the datetime string
+        except Exception: # pylint: disable=broad-except
             pass
             # logging.debug(fn_name + "DEBUG: Unable to parse '" + str(datetime_string) + 
                 # "' as '" + timestamp_format + "': " + shared.get_exception_msg(e))
@@ -94,7 +90,8 @@ def parse_datetime_string(datetime_string, timestamp_formats):
     return None
 
 
-def convert_datetime_string_to_RFC3339(datetime_string, field_name, timestamp_formats):
+def convert_datetime_string_to_RFC3339( # pylint: disable=invalid-name
+                                       datetime_string, field_name, timestamp_formats):
     """ Convert datetime_string to an RFC-3339 datetime string.
     
             datetime_string     The datetime string that was stored in the file
@@ -125,28 +122,28 @@ def convert_datetime_string_to_RFC3339(datetime_string, field_name, timestamp_fo
             #   "404 Not found"
             return constants.ZERO_RFC3339_DATETIME_STRING
         
-        t = None
+        parsed_dt = None
         for timestamp_format in timestamp_formats:
             try:
                 # Try creating a datetime object from a string using the supplied timestamp_format
-                t = datetime.datetime.strptime(datetime_string, timestamp_format)
+                parsed_dt = datetime.datetime.strptime(datetime_string, timestamp_format)
                 try:
                     # Successfuly parsed the datetime string, so return the corresponding RFC-3339 format
-                    rfc_3339_str = t.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                    rfc_3339_str = parsed_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
                     return rfc_3339_str
-                except Exception, e:
+                except Exception, e: # pylint: disable=broad-except
                     try:
                         logging.info(fn_name + constants.INVALID_FORMAT_LOG_LABEL + 
                             "Unable to convert '" + str(field_name) + 
                             "' value '" + str(datetime_string) + "' to an RFC-3339 datetime string: " +
                             shared.get_exception_msg(e))
-                    except Exception, e:
+                    except Exception, e: # pylint: disable=broad-except
                         logging.info(fn_name + constants.INVALID_FORMAT_LOG_LABEL + 
                             "Unable to convert '" + str(field_name) + 
                             "' value to an RFC-3339 datetime string, and unable to log value: " +
                             shared.get_exception_msg(e))
                     
-            except Exception, e:
+            except Exception, e: # pylint: disable=broad-except
                 pass # Try the next format
                 # logging.debug(fn_name + "DEBUG: Unable to parse '" + str(datetime_string) + 
                     # "' as '" + timestamp_format + "': " + shared.get_exception_msg(e))
@@ -156,19 +153,19 @@ def convert_datetime_string_to_RFC3339(datetime_string, field_name, timestamp_fo
             logging.info(fn_name + constants.INVALID_FORMAT_LOG_LABEL + 
                 "Unable to parse '" + str(field_name) + "' value '" + str(datetime_string) + 
                 "' as a datetime using any of the supplied formats")
-        except Exception, e:
+        except Exception, e: # pylint: disable=broad-except
             # Just in case logging the datetime string causes an exception
             logging.info(fn_name + constants.INVALID_FORMAT_LOG_LABEL + 
                 "Unable to parse '" + str(field_name) + "' datetime string as a datetime using any of the supplied formats, and unable to log datetime string: " + shared.get_exception_msg(e))
         
         return None
 
-    except Exception, e:
+    except Exception, e: # pylint: disable=broad-except
         # Major error!
         try:
             logging.error(fn_name + "Error attempting to parse '" + str(field_name) + "' value '" + 
                 str(datetime_string) + "': " + shared.get_exception_msg(e))
-        except Exception, e:
+        except Exception, e: # pylint: disable=broad-except
             # Just in case logging the datetime string causes an exception
             logging.error(fn_name + 
                 "Error attempting to parse '" + str(field_name) + 
@@ -177,7 +174,8 @@ def convert_datetime_string_to_RFC3339(datetime_string, field_name, timestamp_fo
     return None
     
     
-def set_RFC3339_timestamp(task_row_data, field_name, formats):
+def set_RFC3339_timestamp( # pylint: disable=invalid-name
+                          task_row_data, field_name, formats):
     """ Parse timestamp field value and replace with an RFC-3339 datetime string. 
     
             task_row_data   A row of data, as a dictionary object
@@ -198,7 +196,7 @@ def set_RFC3339_timestamp(task_row_data, field_name, formats):
     fn_name = "set_RFC3339_timestamp: "
     try:
         if field_name in task_row_data:
-            if task_row_data[field_name] == None:
+            if task_row_data[field_name] is None:
                 # If we find a None value, we restore the "Zero" RFC-3339 date value here.
                 # GTB stores '0000-01-01T00:00:00.000Z' datetime values (aka constants.ZERO_RFC3339_DATETIME_STRING)
                 # as None, because there is no way to store dates earlier than 1900 in a datetime object
@@ -221,25 +219,27 @@ def set_RFC3339_timestamp(task_row_data, field_name, formats):
                 #       If the 'status' is 'completed', the server uses the current date and time
                 #       If the 'status' is 'needsAction', the created task will not have a completed date 
                 try:
-                    del(task_row_data[field_name])
-                except Exception, e:
-                    logging.error(fn_name + "Unable to delete '" + field_name + "': " + get_exception_msg(e))
+                    del task_row_data[field_name]
+                except Exception, e: # pylint: disable=broad-except
+                    logging.error(fn_name + "Unable to delete '" + field_name + "': " + 
+                        shared.get_exception_msg(e))
                 logservice.flush()
                 
-    except Exception, e:
+    except Exception, e: # pylint: disable=broad-except
         logging.exception(fn_name + "Error attempting to set '" + field_name + "' datetime field value, so deleting field")
         # Delete the field which caused the exception
         try:
-            del(task_row_data[field_name])
-        except Exception, e:
-            logging.error(fn_name + "Unable to delete '" + field_name + "': " + get_exception_msg(e))
+            del task_row_data[field_name]
+        except Exception, e: # pylint: disable=broad-except
+            logging.error(fn_name + "Unable to delete '" + field_name + "': " + 
+                shared.get_exception_msg(e))
         logservice.flush()
 
         
-def _file_contains_valid_columns(file, valid_column_names):
+def _file_contains_valid_columns(file_obj, valid_column_names):
     """Returns True if file is a CSV that contains (at least) all the valid_column_names
     
-            file                  A file object
+            file_obj              A file object
             valid_column_names    A list of valid column names
     
         Returns a tuple;
@@ -258,8 +258,8 @@ def _file_contains_valid_columns(file, valid_column_names):
     fn_name = "_file_contains_valid_columns: "
     
     try:
-        file.seek(0)
-        dict_reader=unicodecsv.DictReader(file,dialect='excel')
+        file_obj.seek(0)
+        dict_reader=unicodecsv.DictReader(file_obj,dialect='excel')
         
         # Check if uploaded file appears to be an Outlook file
         num_outlook_column_names = 0
@@ -284,7 +284,7 @@ def _file_contains_valid_columns(file, valid_column_names):
         # All columns found (there may be extra columns, but that doesn't matter)
         return 'OK', False
         
-    except Exception, e:
+    except Exception, e: # pylint: disable=broad-except
         # 2013-02-19: Kludge to check if the exception is caused by a file that doesn't end in CR/LF
         # At present, processing Mac files returns
         #   "Error: new-line character seen in unquoted field - do you need to open the file in universal-newline mode?"
@@ -304,11 +304,11 @@ def _file_contains_valid_columns(file, valid_column_names):
         return msg, display_line
         
 
-def file_has_valid_encoding(file):
+def file_has_valid_encoding(file_obj):
     """ Checks that file doesn't have a BOM
     
         Arguments:
-            file                A file object that refers to the CSV file to be processed by unicodcsv
+            file_obj    A file object that refers to the CSV file to be processed by unicodcsv
             
         Returns a tuple;
             msg
@@ -317,10 +317,10 @@ def file_has_valid_encoding(file):
     """
     
     try:
-        file.seek(0)
-        header_row = file.readline()
+        file_obj.seek(0)
+        header_row = file_obj.readline()
         # From the chardet.universaldetector package, to detect files with a BOM
-        BOMs = (
+        BOMs = ( # pylint: disable=invalid-name
                 # EF BB BF  UTF-8 with BOM
                 ([0xEF, 0xBB, 0xBF], "UTF-8 with BOM"),
                 # FF FE 00 00  UTF-32, little-endian BOM
@@ -361,18 +361,18 @@ def file_has_valid_encoding(file):
         # File could still be another encoding (e.g., a binary file such as MS Excel or Doc)
         return 'OK'
         
-    except Exception, e:
+    except Exception, e: # pylint: disable=broad-except
         return "Error processing first row of file: " + shared.get_exception_msg(e)
                 
                 
-def file_has_valid_header_row(file, valid_column_names):
+def file_has_valid_header_row(file_obj, valid_column_names):
     """ Checks if the header row is valid.
             - File doesn't have a BOM
             - Header row is plain ASCII
             - Header row contains the minimumm set of valid column names
     
         Arguments:
-            file                A file object that refers to the CSV file to be processed by unicodcsv
+            file_obj            A file object that refers to the CSV file to be processed by unicodcsv
             valid_column_names  A list of valid column names
             
         Returns a tuple;
@@ -389,22 +389,22 @@ def file_has_valid_header_row(file, valid_column_names):
     """
     
     try:
-        file.seek(0)
-        header_row = file.readline()
+        file_obj.seek(0)
+        header_row = file_obj.readline()
         if not header_row.strip():
             return "First row must contain column headers", False
             
         # Check if header row is plain ASCII
         try:
-            s1 = header_row.encode('ascii')
-        except Exception, e:
+            _ = header_row.encode('ascii')
+        except Exception, e: # pylint: disable=broad-except
             return "The header row may only contain plain ASCII characters: " + shared.get_exception_msg(e), True
                                 
         # Check if the file can be parsed by unicodecsv, and that it has the minimum required columns
         # NOTE: _file_contains_valid_columns() returns a tuple
-        return _file_contains_valid_columns(file, valid_column_names)
+        return _file_contains_valid_columns(file_obj, valid_column_names)
 
-    except Exception, e:
+    except Exception, e: # pylint: disable=broad-except
         return "Unable to process header row: " + shared.get_exception_msg(e), True
 
         
@@ -424,7 +424,7 @@ def delete_blobstore(blob_info):
             blob_info.delete()
             logging.debug(fn_name + "Blobstore deleted")
             logservice.flush()
-        except Exception, e:
+        except Exception: # pylint: disable=broad-except
             logging.exception(fn_name + "Exception deleting %s, key = %s" % (blob_info.filename, blob_info.key()))
             logservice.flush()
     else:
@@ -455,11 +455,11 @@ def tasklist_exists(tasklists_svc, tasklist_id):
         result = get_tasklist(tasklists_svc, tasklist_id)
         if result.get('kind') == 'tasks#taskList' and result.get('id') == tasklist_id:
             return True
-        else:
-            # DEBUG
-            logging.debug(fn_name + "DEBUG: Returned data does not appear to be a tasklist, or ID doesn't match " + tasklist_id + " ==>")
-            logging.debug(result)
-            return False
+            
+        logging.debug(fn_name + "DEBUG: Returned data does not appear to be a tasklist, or ID doesn't match " + 
+            tasklist_id + " ==>")
+        logging.debug(result)
+        return False
 
     except apiclient_errors.HttpError, e:
         # logging.debug(fn_name + "Status = [" + str(e.resp.status) + "]")
@@ -470,7 +470,7 @@ def tasklist_exists(tasklists_svc, tasklist_id):
             logging.exception(fn_name + "HttpError retrieving tasklist")
             raise e
         
-    except Exception, e:
+    except Exception, e: # pylint: disable=broad-except
         logging.exception(fn_name + "Exception retrieving tasklist")
         raise e
             
@@ -502,11 +502,10 @@ def get_task_safe(tasks_svc, tasklist_id, task_id):
         
         if result.get('kind') == 'tasks#task' and result.get('id') == task_id:
             return result
-        else:
-            # DEBUG
-            logging.warning(fn_name + "DEBUG: Returned data does not appear to be a task, or ID doesn't match " + task_id + " ==>")
-            logging.debug(result)
-            return None
+            
+        logging.warning(fn_name + "DEBUG: Returned data does not appear to be a task, or ID doesn't match " + task_id + " ==>")
+        logging.debug(result)
+        return None
 
     except apiclient_errors.HttpError, e:
         # logging.debug(fn_name + "DEBUG: Status = [" + str(e.resp.status) + "]")
@@ -517,7 +516,7 @@ def get_task_safe(tasks_svc, tasklist_id, task_id):
             logging.exception(fn_name + "HttpError retrieving task, not a 404")
             raise e
         
-    except Exception, e:
+    except Exception, e: # pylint: disable=broad-except
         logging.exception(fn_name + "Exception retrieving task")
         raise e
             
@@ -528,27 +527,69 @@ def task_exists(tasks_svc, tasklist_id, task_id):
     fn_name = "task_exists: "
     
     try:
+        logging.debug(fn_name + "DEBUG: Retrieving task {}".format(task_id))
         result = get_task(tasks_svc, tasklist_id, task_id)
-        if result.get('kind') == 'tasks#task' and result.get('id') == task_id:
-            return True
-        else:
-            # DEBUG
-            logging.debug(fn_name + "DEBUG: Returned data does not appear to be a task, or ID doesn't match " + task_id + " ==>")
-            logging.debug(result)
-            return False
-
-    except apiclient_errors.HttpError, e:
-        # logging.debug(fn_name + "Status = [" + str(e.resp.status) + "]")
-        # 404 is expected if task does not exist
-        if e.resp.status == 404 or e.resp.status == 400:
-            return False
-        else:
-            logging.exception(fn_name + "HttpError retrieving task, not a 404")
-            raise e
         
-    except Exception, e:
-        logging.exception(fn_name + "Exception retrieving task")
-        raise e
+        # Try logging the returned result to enable debugging.
+        # 'result' should be a JSON object
+        try:
+            try:
+                logging.debug("{}DEBUG:     result (json) = {}".format(
+                    fn_name, json.dumps(result, indent=4)))
+            except Exception as json_parse_ex: # pylint: disable=broad-except
+                logging.info("{}DEBUG: Unable to log result as JSON: {}".format(
+                    fn_name, 
+                    shared.get_exception_msg(json_parse_ex)))
+        except: # pylint: disable=bare-except
+            pass
+        try:
+            logging.debug("{}DEBUG:     result (repr) = {}".format(
+                fn_name, repr(result)))
+        except: # pylint: disable=bare-except
+            pass
+        try:
+            logging.debug("{}DEBUG:     result (raw) = {}".format(
+                fn_name, result))
+        except: # pylint: disable=bare-except
+            pass
+        
+        if result.get('kind') == 'tasks#task' and result.get('id') == task_id:
+            try:
+                if 'parent' in result:
+                    logging.debug("{}DEBUG:     Parent = {}".format(fn_name, result['parent']))
+            except: # pylint: disable=bare-except
+                logging.exception(fn_name + "DEBUG: Unable to log parent ID")
+                
+            try:
+                if 'previous' in result:
+                    logging.debug("{}DEBUG:     Previous = {}".format(fn_name, result['previous']))                
+            except: # pylint: disable=bare-except
+                logging.exception(fn_name + "DEBUG: Unable to log previous ID")
+                
+            logging.debug(fn_name + "DEBUG:     Returning True")
+            return True
+            
+        logging.debug(fn_name + "DEBUG:     Returning False; Returned data does not appear to be a task, or ID doesn't match " + 
+            task_id + ". Result ==>")
+        logging.debug(result)
+        return False
+
+    except apiclient_errors.HttpError as ex:
+        # logging.debug(fn_name + "Status = [" + str(ex.resp.status) + "]")
+        # 404 is expected if task does not exist
+        if ex.resp and (ex.resp.status == 404 or ex.resp.status == 400):
+            logging.debug("{}DEBUG:     Returning False; HttpError {} retrieving task. Task does not exist: {}".format(
+                fn_name, 
+                ex.resp.status,
+                ex))
+            return False
+        else:
+            logging.exception(fn_name + "Raising exception; HttpError retrieving task, not a 404 or 400")
+            raise ex
+        
+    except Exception, ex: # pylint: disable=broad-except
+        logging.exception(fn_name + "Raising exception; Exception retrieving task")
+        raise ex
 
         
 def check_task_params_exist(tasklists_svc, tasks_svc, tasklist_id, parent_id, sibling_id):
@@ -558,44 +599,50 @@ def check_task_params_exist(tasklists_svc, tasks_svc, tasklist_id, parent_id, si
         "], parent [" + str(parent_id) +
         "], sibling [" + str(sibling_id) + "]")
         
-    result = []
+    error_results = []
     
     # Check if tasklist exists
     if tasklist_id:
-        if not tasklist_exists(tasklists_svc, tasklist_id):
+        if tasklist_exists(tasklists_svc, tasklist_id):
+            logging.debug(fn_name + "Tasklist {} exists".format(tasklist_id))
+            logservice.flush()
+        else:
             # logging.error(fn_name + "ERROR: Tasklist [" + str(tasklist_id) + "] doesn't exist")
             # logservice.flush()
-            result.append("Tasklist [" + str(tasklist_id) + "] doesn't exist")
+            error_results.append("Tasklist [" + str(tasklist_id) + "] doesn't exist")
     else:
         # logging.error(fn_name + "ERROR: No tasklist ID!")
         # logservice.flush()
-        result.append("No tasklist ID")
+        error_results.append("No tasklist ID")
                 
     # Check if parent task exists (if it was specified)
     if parent_id:
-        if not task_exists(tasks_svc, tasklist_id, parent_id):
+        if task_exists(tasks_svc, tasklist_id, parent_id):
+            logging.debug(fn_name + "Parent task '{}' exists".format(parent_id))
+            logservice.flush()
+        else:
             # logging.error(fn_name + "ERROR: Parent task [" + str(parent_id) + "] doesn't exist")
             # logservice.flush()
-            result.append("Parent task [" + str(parent_id) + "] doesn't exist")
+            error_results.append("Parent task [" + str(parent_id) + "] doesn't exist")
     # else:
         # logging.debug(fn_name + "DEBUG: No parent ID")
         # logservice.flush()
                 
     # Check if sibling task exists (if it was specified)
     if sibling_id:
-        if not task_exists(tasks_svc, tasklist_id, sibling_id):
+        if task_exists(tasks_svc, tasklist_id, sibling_id):
+            logging.debug(fn_name + "Sibling task '{}' exists".format(sibling_id))
+            logservice.flush()
+        else:
             # logging.error(fn_name + "ERROR: Sibling task [" +  str(sibling_id) + "] doesn't exist")
             # logservice.flush()
-            result.append("Sibling task [" +  str(sibling_id) + "] doesn't exist")
+            error_results.append("Sibling task [" +  str(sibling_id) + "] doesn't exist")
     # else:
         # logging.debug(fn_name + "DEBUG: No sibling ID")
         # logservice.flush()
 
-    if len(result) > 0:
-        logging.error(fn_name + "ERROR: " + ', '.join(result))
+    if error_results:
+        logging.error(fn_name + "ERROR: " + ', '.join(error_results))
     else:
         logging.debug(fn_name + "DEBUG: All task params exist")
     logservice.flush()
-
-
-    

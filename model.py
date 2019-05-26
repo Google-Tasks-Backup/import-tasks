@@ -17,10 +17,8 @@
 
 """Classes to represent Task import job"""
 
-from oauth2client import appengine
-
 from google.appengine.ext import db
-import datetime
+from oauth2client import appengine
 
 import constants
 
@@ -31,7 +29,7 @@ class Credentials(db.Model):
 
 
 
-class ImportTasksJobV1(db.Model):
+class ImportTasksJobV1(db.Model): # pylint: disable=too-many-instance-attributes
     """ Container used to pass User info to taskqueue task, and return tasks progress
         back to foreground process to be returned to the user.
     

@@ -43,6 +43,10 @@ url_source_code = "code.google.com/p/MY-APP-ID/source/browse/"
 # URL to direct people to if they wish to backup their tasks
 url_GTB = "MY-OTHER-APP-ID.appspot.com"
 
+# Email address to which critical errors are emailed
+# If blank, no email will be sent
+SUPPORT_EMAIL_ADDRESS = ""
+
 # -------------------------------
 #   APP-SPECIFIC SETTINGS: End
 # -------------------------------

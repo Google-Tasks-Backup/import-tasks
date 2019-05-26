@@ -22,43 +22,20 @@ __author__ = "julie.smith.1999@gmail.com (Julie Smith)"
 
 import logging
 import os
-import sys
 import datetime
-
-
-# Fix for DeadlineExceeded, because "Pre-Call Hooks to UrlFetch Not Working"
-#     Based on code from https://groups.google.com/forum/#!msg/google-appengine/OANTefJvn0A/uRKKHnCKr7QJ
-from google.appengine.api import urlfetch
-real_fetch = urlfetch.fetch
-def fetch_with_deadline(url, *args, **argv):
-    argv['deadline'] = settings.URL_FETCH_TIMEOUT
-    logservice.flush()
-    return real_fetch(url, *args, **argv)
-urlfetch.fetch = fetch_with_deadline
-
-import httplib2
-from oauth2client.appengine import OAuth2Decorator
+import urllib
 
 import webapp2
 
 
-from google.appengine.ext import db
-from google.appengine.ext.webapp import template
-from google.appengine.runtime import apiproxy_errors
-from google.appengine.runtime import DeadlineExceededError
-from google.appengine.api import urlfetch_errors
+from google.appengine.api import urlfetch
 from google.appengine.api import logservice # To flush logs
+from google.appengine.api.app_identity import get_application_id
+from google.appengine.ext.webapp import template
 from google.appengine.ext import blobstore
 from google.appengine.ext.webapp import blobstore_handlers
-from google.appengine.api.app_identity import get_application_id
 
-import httplib2
 from oauth2client.appengine import OAuth2Decorator
-
-logservice.AUTOFLUSH_EVERY_SECONDS = 5
-logservice.AUTOFLUSH_EVERY_BYTES = None
-logservice.AUTOFLUSH_EVERY_LINES = 5
-logservice.AUTOFLUSH_ENABLED = True
 
 
 # Project-specific imports
@@ -66,17 +43,32 @@ import model
 import settings
 import appversion # appversion.version is set before the upload process to keep the version number consistent
 import shared # Code which is common between classes, modules or projects
-import import_tasks_shared  # Code which is common between classes or modules
 import constants
 import host_settings
 
-msg = "Authorisation error. Please report this error to " + settings.url_issues_page
+logservice.AUTOFLUSH_EVERY_SECONDS = 5
+logservice.AUTOFLUSH_EVERY_BYTES = None
+logservice.AUTOFLUSH_EVERY_LINES = 5
+logservice.AUTOFLUSH_ENABLED = True
 
-auth_decorator = OAuth2Decorator(client_id=host_settings.CLIENT_ID,
+# Fix for DeadlineExceeded, because "Pre-Call Hooks to UrlFetch Not Working"
+#     Based on code from https://groups.google.com/forum/#!msg/google-appengine/OANTefJvn0A/uRKKHnCKr7QJ
+real_fetch = urlfetch.fetch # pylint: disable=invalid-name
+def fetch_with_deadline(url, *args, **argv):
+    argv['deadline'] = settings.URL_FETCH_TIMEOUT
+    logservice.flush()
+    return real_fetch(url, *args, **argv)
+urlfetch.fetch = fetch_with_deadline
+
+
+auth_err_msg = "Authorisation error. Please report this error to " + settings.url_issues_page # pylint: disable=invalid-name
+
+auth_decorator = OAuth2Decorator( # pylint: disable=invalid-name
+                                 client_id=host_settings.CLIENT_ID,
                                  client_secret=host_settings.CLIENT_SECRET,
                                  scope=host_settings.SCOPE,
                                  user_agent=host_settings.USER_AGENT,
-                                 message=msg)
+                                 message=auth_err_msg)
                             
 
 class DownloadStatsHandler(webapp2.RequestHandler):
@@ -109,7 +101,7 @@ class DownloadStatsHandler(webapp2.RequestHandler):
             logging.debug(fn_name + "<End>" )
             logservice.flush()
             
-        except Exception, e:
+        except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught top-level exception")
             
             self.response.headers["Content-Type"] = "text/html; charset=utf-8"
@@ -118,8 +110,8 @@ class DownloadStatsHandler(webapp2.RequestHandler):
                 # If not removed, output goes to file (if error generated after "Content-Disposition" was set),
                 # and user would not see the error message!
                 del self.response.headers["Content-Disposition"]
-            except Exception, e1:
-                logging.debug(fn_name + "Unable to delete 'Content-Disposition' from headers (may not be a problem, because header may not have had it set): " + shared.get_exception_msg(e1))
+            except Exception, ex1: # pylint: disable=broad-except
+                logging.debug(fn_name + "Unable to delete 'Content-Disposition' from headers (may not be a problem, because header may not have had it set): " + shared.get_exception_msg(ex1))
             self.response.clear() 
             
             self.response.out.write("""Oops! Something went terribly wrong.<br />%s<br />Please report this error to <a href="http://code.google.com/p/tasks-backup/issues/list">code.google.com/p/tasks-backup/issues/list</a>""" % shared.get_exception_msg(e))
@@ -151,7 +143,7 @@ class BulkDeleteBlobstoreHandler(webapp2.RequestHandler):
                     try:
                         blob_info.delete()
                         del_count = del_count + 1
-                    except Exception, e:
+                    except Exception, e: # pylint: disable=broad-except
                         logging.exception(fn_name + "Exception deleting blobstore [" + str(del_count) + "] " + str(blob_key))
                         self.response.out.write("""<div>Error deleting blobstore %s</div>%s""" % (blob_key, shared.get_exception_msg(e)))
                 else:
@@ -165,7 +157,7 @@ class BulkDeleteBlobstoreHandler(webapp2.RequestHandler):
             logging.debug(fn_name + "<End>")
             logservice.flush()
             
-        except Exception, e:
+        except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught top-level exception")
             shared.serve_outer_exception_message(self, e)
             logging.debug(fn_name + "<End> due to exception" )
@@ -203,11 +195,12 @@ class ManageBlobstoresHandler(webapp2.RequestHandler):
             
             if blobstore.BlobInfo.all().count(1) > 0:
                 # There is at least one BlobInfo in the blobstore
+                content_types_cnt = {}
                 
-                self.response.out.write('<div>Found ' + str(blobstore.BlobInfo.all().count(1)) +
+                sorted_blob_infos = sorted(blobstore.BlobInfo.all(), key=lambda k: k.creation) 
+                
+                self.response.out.write('<div>Found ' + str(len(sorted_blob_infos)) +
                     ' blobstores</div><br />')
-                
-                sorted_blobstores = sorted(blobstore.BlobInfo.all(), key=lambda k: k.creation) 
                 
                 self.response.out.write('<form method="POST" action = "' + settings.ADMIN_BULK_DELETE_BLOBSTORE_URL + '">')
                 self.response.out.write('<table cellpadding="5">')
@@ -215,16 +208,25 @@ class ManageBlobstoresHandler(webapp2.RequestHandler):
                 self.response.out.write('<tr><td colspan="4">')
                 self.response.out.write('<td style="white-space: nowrap"><input type="checkbox" onClick="toggleCheckboxes(this);" /> Toggle All</td></tr>')
 
-                #for b in blobstore.BlobInfo.all():
-                for b in sorted_blobstores:
+                #for blob_info in blobstore.BlobInfo.all():
+                for blob_info in sorted_blob_infos:
+                    if blob_info.content_type in content_types_cnt:
+                        content_types_cnt[blob_info.content_type] += 1
+                    else:
+                        content_types_cnt[blob_info.content_type] = 1
                     self.response.out.write('<tr>')
-                    self.response.out.write('<td style="white-space: nowrap">' + b.filename + 
-                        '</td><td>' + str(b.creation) +
-                        '</td><td>' + str(b.size) +
-                        '</td><td>' + str(b.content_type) +
-                        '</td><td><input type="checkbox" name="blob_key" value="' + str(b.key()) + '" ></td>')
+                    self.response.out.write('<td style="white-space: nowrap">' + blob_info.filename + 
+                        '</td><td>' + str(blob_info.creation) +
+                        '</td><td>' + str(blob_info.size) +
+                        '</td><td>' + str(blob_info.content_type) +
+                        '</td><td><input type="checkbox" name="blob_key" value="' + str(blob_info.key()) + '" ></td>')
                     self.response.out.write('</tr>')
                 self.response.out.write('</table>')
+                self.response.out.write('<div>')
+                self.response.out.write('<h3>Totals:</h3>')
+                for key, val in content_types_cnt.iteritems():
+                    self.response.out.write('<p>{} {}</p>'.format(val, key))
+                self.response.out.write('</div>')
                 self.response.out.write("""<input type="submit" value="Delete selected blobstores" class="big-button" ></input>""")
                 self.response.out.write('<form>')
             else:
@@ -235,7 +237,7 @@ class ManageBlobstoresHandler(webapp2.RequestHandler):
             logging.debug(fn_name + "<End>")
             logservice.flush()
             
-        except Exception, e:
+        except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught top-level exception")
             shared.serve_outer_exception_message(self, e)
             logging.debug(fn_name + "<End> due to exception" )
@@ -251,13 +253,13 @@ class DeleteBlobstoreHandler(blobstore_handlers.BlobstoreDownloadHandler):
         blob_key = str(urllib.unquote(blob_key))
         blob_info = blobstore.BlobInfo.get(blob_key)
         
+        msg = ''
         if blob_info:
             try:
                 blob_info.delete()
                 self.redirect(settings.MAIN_PAGE_URL)
                 return
-            except Exception, e:
-                
+            except Exception, e: # pylint: disable=broad-except                
                 msg = """Error deleting blobstore %s<br />%s""" % (blob_key, shared.get_exception_msg(e))
         else:
             msg = """Blobstore %s doesn't exist""" % blob_key
@@ -270,11 +272,10 @@ class DeleteBlobstoreHandler(blobstore_handlers.BlobstoreDownloadHandler):
         
 
 
-app = webapp2.WSGIApplication(
+app = webapp2.WSGIApplication( # pylint: disable=invalid-name
     [
         (settings.ADMIN_MANAGE_BLOBSTORE_URL,       ManageBlobstoresHandler),
         (settings.ADMIN_DELETE_BLOBSTORE_URL,       DeleteBlobstoreHandler),
         (settings.ADMIN_BULK_DELETE_BLOBSTORE_URL,  BulkDeleteBlobstoreHandler),
         (settings.ADIMN_RETRIEVE_STATS_CSV_URL,     DownloadStatsHandler),
     ], debug=False)
-

@@ -17,7 +17,7 @@
 # This module contains any value, especially strings, that is referenced in more than one location.
 
 
-class ImportJobStatus(object):
+class ImportJobStatus(object): # pylint: disable=too-few-public-methods
     # CAUTION: The Django progress.html template uses string literals when checking the status value. 
     # If these values are changed, then the progress.html must also be changed
     STARTING = 'Starting' # Job has been created (request places on task queue)
@@ -32,7 +32,7 @@ class ImportJobStatus(object):
     STOPPED_VALUES = [IMPORT_COMPLETED, ERROR, STALLED]
 
     
-class ImportMethod(object):
+class ImportMethod(object): # pylint: disable=too-few-public-methods
     # These constants are used in many places, including;
     #       model.py
     #           ImportTasksJobV1.import_method
@@ -60,7 +60,7 @@ class ImportMethod(object):
     CREATE_NEW_TASKLIST_VALUES = [APPEND_TIMESTAMP, USE_OWN_SUFFIX, IMPORT_AS_IS, REPLACE_TASKLIST_CONTENT, DELETE_BEFORE_IMPORT, SKIP_DUPLICATE_TASKLIST]
     
     
-class PauseReason(object):
+class PauseReason(object): # pylint: disable=too-few-public-methods
     NONE = ''
     DAILY_LIMIT_EXCEEDED = "daily limit was exceeded"
     USER_INTERRUPTED = "user interrupted the import job"

@@ -7,8 +7,11 @@
 #   Where 0 is the Major and 4 is the Minor
 # When going live, use the full version number (e.g., 'gti-0-4-304')
 #   Where 0 is the Major, 4 is the Minor and 304 is the Revision
-version: gti-0-6-003
+#version: gti-0-6-003
 #version: test-gti-0-6
+# version: gti-0-7
+# version: test
+version: gti-0-7-20
 
 # ===== Production server ======
 application: import-tasks
@@ -21,6 +24,30 @@ application: import-tasks
 
 # ===== Local host ==========
 #application: import-tasks-local
+
+skip_files:
+- ^\.hg*$
+- ^\.git*$
+- ^\.pylintrc$
+- ^\.idea
+- ^\.vs
+- ^\.vscode
+- ^archive$
+- ^bin
+- ^obj
+- ^testing
+- ^venv
+- ^\.hg\\.*$
+- ^\.tags*
+- ^(.*/)?.*~$
+- ^(.*/)?.*\.py[co]$
+- ^(.*/)?\..*$
+- ^!.*$
+- ^.*\.pyc$
+- ^.*\.bak$
+- ^[Tt]humbs\.db$
+- ^test.*$
+- .*_orig$
 
 threadsafe: false
 runtime: python27

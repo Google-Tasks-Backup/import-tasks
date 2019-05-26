@@ -32,7 +32,11 @@ Uses status constants: STARTING, INITIALISING, IMPORTING, IMPORT_COMPLETED, ERRO
             {% endif %}
         {% endif %}
         
-        <title>{{ app_title }} - Progress</title>
+        {% if status == IMPORT_COMPLETED %}
+            <title>{{ app_title }} - Import completed</title>        
+        {% else %}
+            <title>{{ app_title }} - Progress</title>        
+        {% endif %}
         <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css" />
         <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
                 
@@ -199,7 +203,8 @@ Uses status constants: STARTING, INITIALISING, IMPORTING, IMPORT_COMPLETED, ERRO
                         <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a>
                     {% else %}
                         Please help improve GTI by reporting this error at 
-                        <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a>
+                        <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a><br>
+                        or by sending an email to <a href="mailto:{{ email_discussion_group }}">{{ email_discussion_group }}</a>
                     {% endif %}
                 </div>
                 <br />

@@ -5,7 +5,6 @@
 settings.py
 host_settings.py
 app.yaml
-Changes since last commit.txt
 
 
 #############
@@ -22,11 +21,24 @@ Desktop.ini
 # Recycle Bin used on file shares
 $RECYCLE.BIN/
 
+################################
+## Other files/folders to ignore
+################################
+
 *.bak
+archive
+.*_v[0-9]\.[0-9]\.[0-9][0-9][0-9].*
+.* [0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9].*
+.* - Copy\..*
+,*_orig
+.hg
+.hg.*
+! Current changes.txt
+Changes since last commit.txt
+version_info.txt
 
 #############
 ## Python
 #############
 
 *.py[cod]
-

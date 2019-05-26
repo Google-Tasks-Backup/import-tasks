@@ -1,17 +1,19 @@
 
 import logging
 from google.appengine.api import logservice # To flush logs
+import shared
 
 logservice.AUTOFLUSH_EVERY_SECONDS = 5
 logservice.AUTOFLUSH_EVERY_BYTES = None
 logservice.AUTOFLUSH_EVERY_LINES = 5
 logservice.AUTOFLUSH_ENABLED = True
 
-import shared
 
 
 
-def depth_is_valid(task_row_data, row_num, is_test_user, compare_with_previous_row = False, is_first_task_in_tasklist = False, prev_row_depth = 0):
+def depth_is_valid( #pylint: disable=too-many-arguments,too-many-return-statements
+                   task_row_data, row_num, is_test_user, compare_with_previous_row = False, 
+                   is_first_task_in_tasklist = False, prev_row_depth = 0):
     """
         params
             task_row_data               a dictionary representing a row from a CSV file
@@ -49,7 +51,7 @@ def depth_is_valid(task_row_data, row_num, is_test_user, compare_with_previous_r
         return True, 0, "", ""
     
     # Check for missing depth field
-    if task_row_data['depth'] == None:
+    if task_row_data['depth'] is None:
         err_msg1 = "Missing depth field for data row " + str(row_num)
         err_msg2 = "Either the number of fields does not match the number of header columns, or there may be a newline in a non-quoted field"
         # ERROR: No depth
@@ -57,7 +59,7 @@ def depth_is_valid(task_row_data, row_num, is_test_user, compare_with_previous_r
         
     # Check for blank depth value
     depth_str = unicode(task_row_data['depth']).strip()
-    if len(depth_str) == 0:
+    if not depth_str:
         if is_test_user:
             logging.debug(fn_name + "TEST: Blank 'depth' property in data row " + 
                 str(row_num) + ". Will set depth = 0 and import task as root")
@@ -68,7 +70,7 @@ def depth_is_valid(task_row_data, row_num, is_test_user, compare_with_previous_r
     # Interpret the depth value
     try:
         depth = int(depth_str)
-    except Exception, e:
+    except Exception, e: # pylint: disable=broad-except
         err_msg1 = ("Invalid 'depth' value [" + unicode(task_row_data['depth']) + 
             "] for data row " + str(row_num))
         err_msg2 = "The 'depth' value can be blank, or any whole number from -1 upwards"

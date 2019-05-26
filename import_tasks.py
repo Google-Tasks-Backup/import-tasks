@@ -19,59 +19,30 @@
 
 """Main web application handler for Google Tasks Import."""
 
+# pylint: disable=too-many-lines
+
 __author__ = "julie.smith.1999@gmail.com (Julie Smith)"
 
 import logging
 import os
 import pickle
-import sys
-import gc
-import cgi
-import string
+# import gc
 import time # For sleep
+import datetime
 
-
-# Fix for DeadlineExceeded, because "Pre-Call Hooks to UrlFetch Not Working"
-#     Based on code from https://groups.google.com/forum/#!msg/google-appengine/OANTefJvn0A/uRKKHnCKr7QJ
-from google.appengine.api import urlfetch
-real_fetch = urlfetch.fetch
-def fetch_with_deadline(url, *args, **argv):
-    argv['deadline'] = settings.URL_FETCH_TIMEOUT
-    logservice.flush()
-    return real_fetch(url, *args, **argv)
-urlfetch.fetch = fetch_with_deadline
-
-import httplib2
-from oauth2client.appengine import OAuth2Decorator
 
 import webapp2
 
-
-from google.appengine.api import mail
-from google.appengine.api import memcache
+from google.appengine.api import urlfetch
 from google.appengine.api import taskqueue
 from google.appengine.api import users
-from google.appengine.ext import db
-from google.appengine.ext import webapp
-from google.appengine.runtime import apiproxy_errors
-from google.appengine.runtime import DeadlineExceededError
-from google.appengine.api import urlfetch_errors
 from google.appengine.api import logservice # To flush logs
 from google.appengine.ext import blobstore
 from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp import blobstore_handlers
 
-logservice.AUTOFLUSH_EVERY_SECONDS = 5
-logservice.AUTOFLUSH_EVERY_BYTES = None
-logservice.AUTOFLUSH_EVERY_LINES = 5
-logservice.AUTOFLUSH_ENABLED = True
+from oauth2client.appengine import OAuth2Decorator
 
-import httplib2
-import urllib
-import Cookie
-
-import datetime
-from datetime import timedelta
 import unicodecsv # Used instead of csv, supports unicode
 
 # Project-specific imports
@@ -85,18 +56,32 @@ import constants
 import host_settings
 
 
-msg = "Authorisation error. Please report this error to " + settings.url_issues_page
+logservice.AUTOFLUSH_EVERY_SECONDS = 5
+logservice.AUTOFLUSH_EVERY_BYTES = None
+logservice.AUTOFLUSH_EVERY_LINES = 5
+logservice.AUTOFLUSH_ENABLED = True
 
-auth_decorator = OAuth2Decorator(client_id=host_settings.CLIENT_ID,
+
+# Fix for DeadlineExceeded, because "Pre-Call Hooks to UrlFetch Not Working"
+#     Based on code from https://groups.google.com/forum/#!msg/google-appengine/OANTefJvn0A/uRKKHnCKr7QJ
+real_fetch = urlfetch.fetch # pylint: disable=invalid-name
+def fetch_with_deadline(url, *args, **argv):
+    argv['deadline'] = settings.URL_FETCH_TIMEOUT
+    logservice.flush()
+    return real_fetch(url, *args, **argv)
+urlfetch.fetch = fetch_with_deadline
+
+
+msg = "Authorisation error. Please report this error to " + settings.url_issues_page # pylint: disable=invalid-name
+auth_decorator = OAuth2Decorator( # pylint: disable=invalid-name
+                                 client_id=host_settings.CLIENT_ID,
                                  client_secret=host_settings.CLIENT_SECRET,
                                  scope=host_settings.SCOPE,
                                  user_agent=host_settings.USER_AGENT,
                                  message=msg)
                             
-                            
-                            
 
-def _send_job_to_worker(self, process_tasks_job):
+def _send_job_to_worker(self, process_tasks_job): # pylint: disable=too-many-statements
     """ Place the import job details on the taskqueue, so that the worker can process the uploaded data.
     
         This method may be called from;
@@ -131,8 +116,8 @@ def _send_job_to_worker(self, process_tasks_job):
         process_tasks_job.put()
         
         # Add the request to the tasks queue, passing in the user's email so that the task can access the database record
-        q = taskqueue.Queue(settings.PROCESS_TASKS_REQUEST_QUEUE_NAME)
-        t = taskqueue.Task(url=settings.WORKER_URL, 
+        tq_queue = taskqueue.Queue(settings.PROCESS_TASKS_REQUEST_QUEUE_NAME)
+        tq_task = taskqueue.Task(url=settings.WORKER_URL, 
             params={settings.TASKS_QUEUE_KEY_NAME : user_email}, method='POST')
         logging.debug(fn_name + "Adding task to %s queue, for %s" % 
             (settings.PROCESS_TASKS_REQUEST_QUEUE_NAME, user_email))
@@ -142,10 +127,10 @@ def _send_job_to_worker(self, process_tasks_job):
         while retry_count > 0:
             retry_count = retry_count - 1
             try:
-                q.add(t)
+                tq_queue.add(tq_task)
                 break
                 
-            except Exception, e:
+            except Exception, e: # pylint: disable=broad-except
                 # Ensure that the job doesn't time out
                 process_tasks_job.job_progress_timestamp = datetime.datetime.now() # UTC
                 process_tasks_job.message = 'Waiting for server ...'
@@ -213,7 +198,7 @@ def _send_job_to_worker(self, process_tasks_job):
         logging.debug(fn_name + "<End> (Daily Limit Exceeded)")
         logservice.flush()
         
-    except Exception, e:
+    except Exception, e: # pylint: disable=broad-except
         logging.exception(fn_name + "Caught top-level exception")
         shared.serve_outer_exception_message(self, e)
         logging.debug(fn_name + "<End> due to exception" )
@@ -241,9 +226,9 @@ class WelcomeHandler(webapp2.RequestHandler):
         
 
         try:
-            display_link_to_production_server = False
+            display_link_to_production_server = False # pylint: disable=invalid-name
             if not self.request.host in settings.PRODUCTION_SERVERS and settings.DISPLAY_LINK_TO_PRODUCTION_SERVER:
-                display_link_to_production_server = True
+                display_link_to_production_server = True # pylint: disable=invalid-name
             
             user = users.get_current_user()
             user_email = None
@@ -255,7 +240,7 @@ class WelcomeHandler(webapp2.RequestHandler):
                     # logging.debug(fn_name + "DEBUG: Running on limited-access server")
                     if shared.is_test_user(user_email):
                         # Allow test user to see normal page content
-                        display_link_to_production_server = False
+                        display_link_to_production_server = False # pylint: disable=invalid-name
                 
                 logging.debug(fn_name + "User is logged in, so displaying username and logout link")
                 is_admin_user = users.is_current_user_admin()
@@ -305,7 +290,7 @@ class WelcomeHandler(webapp2.RequestHandler):
             logging.debug(fn_name + "<End> (Daily Limit Exceeded)")
             logservice.flush()
             
-        except Exception, e:
+        except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught top-level exception")
             shared.serve_outer_exception_message(self, e)
             logging.debug(fn_name + "<End> due to exception" )
@@ -322,7 +307,7 @@ class MainHandler(webapp2.RequestHandler):
     """
 
     @auth_decorator.oauth_required
-    def get(self):
+    def get(self): # pylint: disable=too-many-locals,too-many-statements
         """ Main page, once user has been authenticated """
 
         fn_name = "MainHandler.get(): "
@@ -337,14 +322,14 @@ class MainHandler(webapp2.RequestHandler):
             user_email = user.email()
             is_admin_user = users.is_current_user_admin()
             
-            display_link_to_production_server = False
+            display_link_to_production_server = False # pylint: disable=invalid-name
             if not self.request.host in settings.PRODUCTION_SERVERS:
                 # logging.debug(fn_name + "Running on limited-access server")
                 if settings.DISPLAY_LINK_TO_PRODUCTION_SERVER:
-                    display_link_to_production_server = True
+                    display_link_to_production_server = True # pylint: disable=invalid-name
                 if shared.is_test_user(user_email):
                     # Allow test user to see normal page
-                    display_link_to_production_server = False
+                    display_link_to_production_server = False # pylint: disable=invalid-name
                 else:
                     logging.info(fn_name + "Rejecting non-test user [" + str(user_email) + "] on limited access server")
                     logservice.flush()
@@ -439,8 +424,6 @@ class MainHandler(webapp2.RequestHandler):
                                'file_name' : file_name,
                                'job_start_timestamp' : job_start_timestamp, # UTC
                                'manage_blobstore_url' : settings.ADMIN_MANAGE_BLOBSTORE_URL,
-                               'outlook_instructions_url' : settings.OUTLOOK_INSTRUCTIONS_URL,
-                               'continue_job_url' : settings.CONTINUE_IMPORT_JOB_URL,
                                'user_email' : user_email,
                                'msg': self.request.get('msg'),
                                'APPEND_TIMESTAMP' : constants.ImportMethod.APPEND_TIMESTAMP,
@@ -471,7 +454,7 @@ class MainHandler(webapp2.RequestHandler):
             logging.debug(fn_name + "<End> (Daily Limit Exceeded)")
             logservice.flush()
                         
-        except Exception, e:
+        except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught top-level exception")
             shared.serve_outer_exception_message(self, e)
             logging.debug(fn_name + "<End> due to exception" )
@@ -494,7 +477,7 @@ class ContinueImportJob(webapp2.RequestHandler):
 
         try:
             self._continue_import_job()
-        except Exception, e:
+        except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught top-level exception")
             shared.serve_outer_exception_message(self, e)
             logging.debug(fn_name + "<End> due to exception" )
@@ -515,7 +498,7 @@ class ContinueImportJob(webapp2.RequestHandler):
     
         try:
             self._continue_import_job()
-        except Exception, e:
+        except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught top-level exception")
             shared.serve_outer_exception_message(self, e)
             logging.debug(fn_name + "<End> due to exception" )
@@ -604,7 +587,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
             logging.warning(fn_name + "Unexpected GET, so redirecting to " + settings.MAIN_PAGE_URL)
             logservice.flush()
             self.redirect(settings.MAIN_PAGE_URL)
-        except Exception, e:
+        except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught top-level exception")
             shared.serve_outer_exception_message(self, e)
             logging.debug(fn_name + "<End> due to exception" )
@@ -615,7 +598,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
 
     
     @auth_decorator.oauth_required
-    def post(self):
+    def post(self): # pylint: disable=too-many-locals,too-many-statements,too-many-return-statements,too-many-branches
         """ Get the blob_info of the uploaded file, store the details of the import job, and try to start the import job
         
             The Blobstore upload lands at this URL as a POST
@@ -626,20 +609,19 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
         logging.debug(fn_name + "<Start>")
         logservice.flush()
         
-        try:
+        try: # pylint: disable=too-many-nested-blocks
             user = users.get_current_user()
             
             user_email = user.email()
-            is_admin_user = users.is_current_user_admin()
             
-            display_link_to_production_server = False
+            display_link_to_production_server = False # pylint: disable=invalid-name,unused-variable
             if not self.request.host in settings.PRODUCTION_SERVERS:
                 # logging.debug(fn_name + "Running on limited-access server")
                 if settings.DISPLAY_LINK_TO_PRODUCTION_SERVER:
-                    display_link_to_production_server = True
+                    display_link_to_production_server = True # pylint: disable=invalid-name
                 if shared.is_test_user(user_email):
                     # Allow test user to see normal page
-                    display_link_to_production_server = False
+                    display_link_to_production_server = False # pylint: disable=invalid-name
                 else:
                     logging.info(fn_name + "Rejecting non-test user [" + unicode(user_email) + "] on limited access server")
                     logservice.flush()
@@ -722,7 +704,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                 try:
                     blobs = blobstore.BlobInfo.get(blob_key)
                     file_name = blobs.filename
-                except Exception, e:
+                except Exception, e: # pylint: disable=broad-except
                     logging.error(fn_name + "Unable to determine the filename of the uploaded file: " + 
                         shared.get_exception_msg(e))
                     logservice.flush()
@@ -777,7 +759,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                     try:
                         test_reader.seek(0)
                         line1 = unicode(test_reader.readline().strip(), "utf-8")
-                    except Exception, e:
+                    except Exception, e: # pylint: disable=broad-except
                         logging.info(fn_name + constants.INVALID_FORMAT_LOG_LABEL + 
                             "Unable to read first line of file as UTF-8")
                         err_msg1 = "Error processing header row of file: " + shared.get_exception_msg(e)
@@ -793,7 +775,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                     if shared.is_test_user(user_email):
                         try:
                             logging.debug(fn_name + u"TEST: First line = '%s'" % line1)
-                        except Exception, e:
+                        except Exception, e: # pylint: disable=broad-except
                             logging.debug(fn_name + u"TEST: Unable to log first line: " + shared.get_exception_msg(e))
                     
                     # ========================
@@ -829,7 +811,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                                     err_msg2 = "Invalid header row: &nbsp; <span class='fixed-font'>" + line1 + "</span>"
                                     logging.info(fn_name + constants.INVALID_FORMAT_LOG_LABEL + 
                                         err_msg1 + ": Header row = '" + line1 + "'")
-                                except Exception, e:
+                                except Exception, e: # pylint: disable=broad-except
                                     err_msg2 = "Invalid header row in file" 
                                     logging.info(fn_name + constants.INVALID_FORMAT_LOG_LABEL + 
                                         err_msg1 + " and unable to log header row: " +
@@ -847,7 +829,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                                 show_custom_button=True)
                             return
                             
-                except Exception, e:
+                except Exception, e: # pylint: disable=broad-except
                     logging.exception(fn_name + "Error reading file (determining file type)")
                     # Don't log/dispay file name or content, as non-ASCII string may cause another exception
                     err_msg1 = "Unable to import tasks - Unknown data format in file"
@@ -863,7 +845,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                     # Try to log the offending data
                     try:
                         logging.debug(fn_name + u"First line = '%s'" % line1)
-                    except Exception, e:
+                    except Exception, e: # pylint: disable=broad-except
                         logging.exception(fn_name + "Unable to log first line")
                     
                     return
@@ -904,7 +886,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                         file_format_version = None
                         try:
                             file_format_version = pickle.load(blob_reader)
-                        except Exception, e:
+                        except Exception, e: # pylint: disable=broad-except
                             logging.exception(fn_name + "Error unpickling file format version string")
                             err_msg1 = "This is not a valid GTBak file, or the file contents is corrupted"
                             logging.info(fn_name + constants.INVALID_FORMAT_LOG_LABEL + err_msg1)
@@ -933,7 +915,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                         tasks_data = None
                         try:
                             tasks_data = pickle.load(blob_reader)
-                        except Exception, e:
+                        except Exception, e: # pylint: disable=broad-except
                             logging.exception(fn_name + "Error unpickling tasks data")
                             err_msg1 = "This is not a valid GTBak file, or the file contents is corrupted"
                             err_msg2 = shared.get_exception_msg(e)
@@ -992,7 +974,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                                 show_custom_button=True)
                             return
                             
-                    except Exception, e:
+                    except Exception, e: # pylint: disable=broad-except
                         logging.exception(fn_name + "Exception parsing GTBak file")
                         err_msg1 = "Error reading import file"
                         err_msg2 = "The data is not in the correct GTBak format: " + shared.get_exception_msg(e)
@@ -1043,7 +1025,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                 shared.serve_message_page(self, 'No file uploaded, please try again.', show_custom_button=True)
                 
                 
-        except Exception, e:
+        except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught top-level exception")
             shared.serve_outer_exception_message(self, e)
             logging.debug(fn_name + "<End> due to exception" )
@@ -1072,7 +1054,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
         fn_name = "_all_fields_have_values: "
         
         for col_name in required_column_names:
-            if task_row_data[col_name] == None:
+            if task_row_data[col_name] is None:
                 err_msg1 = "Missing '" + col_name + "' value in data row " + str(row_num)
                 err_msg2 = """Possible causes: 
                     <ol> 
@@ -1094,10 +1076,11 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
         
         
         
-    def _csv_file_contains_valid_data(self, file, import_tasklist_suffix, file_name = None):
+    def _csv_file_contains_valid_data( # pylint: disable=too-many-locals,too-many-return-statements,too-many-branches,too-many-statements
+                                      self, file_obj, import_tasklist_suffix, file_name = None):
         """Returns true if the file contains data in a format that can be parsed by the worker.
             
-                file                    A file object referring to a CSV file
+                file_obj                A file object referring to a CSV file
                 import_tasklist_suffix  The optional tasklist name suffix chosen by the user
                                             This is need to check that the overall tasklist name length is below the limit
                 file_name               Name of file, for reporting error to user
@@ -1112,7 +1095,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
             prev_depth = 0
             prev_tasklist_name = ""
             self.num_data_rows = 0
-            dict_reader=unicodecsv.DictReader(file,dialect='excel')
+            dict_reader=unicodecsv.DictReader(file_obj,dialect='excel')
             
             column_names = dict_reader.fieldnames
             
@@ -1127,7 +1110,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                         logging.debug(fn_name + u"TEST: "  + constants.INVALID_FORMAT_LOG_LABEL + " task_row_data ==>")
                         try:
                             logging.debug(task_row_data)
-                        except Exception, e:
+                        except Exception, e: # pylint: disable=broad-except
                             logging.debug(fn_name + u"TEST: Unable to log task_row_data: " + shared.get_exception_msg(e))
                             
                     logging.info(fn_name + constants.INVALID_FORMAT_LOG_LABEL +
@@ -1242,7 +1225,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                     try:
                         err_msg1 = "Invalid status value &nbsp; '<span class='fixed-font'>" + str(status) + \
                             "</span>' &nbsp; in data row " + str(self.num_data_rows)
-                    except Exception, e:
+                    except Exception, e: # pylint: disable=broad-except
                         err_msg1 = "Invalid status value in data row " + str(self.num_data_rows)
                     err_msg2 = 'The "status" value can only be "completed" or "needsAction"'
                     import_tasks_shared.serve_invalid_file_format_page(self, file_name, err_msg1, err_msg2, show_custom_button=True)
@@ -1269,7 +1252,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                         try:
                             err_msg1 = "Invalid 'hidden' value &nbsp; '<span class='fixed-font'>" + unicode(hidden) + \
                                 "</span>' &nbsp; in data row " + str(self.num_data_rows)
-                        except Exception, e:
+                        except Exception, e: # pylint: disable=broad-except
                             err_msg1 = "Invalid 'hidden' value in data row " + str(self.num_data_rows)
                         err_msg2 = 'The "hidden" value can only be "True", "False" or blank'
                         import_tasks_shared.serve_invalid_file_format_page(self, file_name, err_msg1, err_msg2, 
@@ -1293,7 +1276,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                         try:
                             err_msg1 = "Invalid 'deleted' value &nbsp; '<span class='fixed-font'>" + unicode(deleted) + \
                                 "</span>' &nbsp; in data row " + str(self.num_data_rows)
-                        except Exception, e:
+                        except Exception, e: # pylint: disable=broad-except
                             err_msg1 = "Invalid 'deleted' value in data row " + str(self.num_data_rows)
                         err_msg2 = 'The "deleted" value can only be "True", "False" or blank'
                         import_tasks_shared.serve_invalid_file_format_page(self, file_name, err_msg1, err_msg2, 
@@ -1320,7 +1303,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
             logservice.flush()
             return True
             
-        except Exception, e:
+        except Exception, e: # pylint: disable=broad-except
             # Invalid user files are generally caused by;
             #   incompatible encoding (i.e., not UTF-8 or ASCII), or 
             #   unsupported line endings (i.e., not using Windows-style CR/LF)
@@ -1367,7 +1350,7 @@ class ShowProgressHandler(webapp2.RequestHandler):
     """Handler to display progress to the user """
     
     @auth_decorator.oauth_required
-    def get(self):
+    def get(self): # pylint: disable=too-many-statements,too-many-branches,too-many-locals
         """Display the progress page, which includes a refresh meta-tag to recall this page every n seconds"""
         fn_name = "ShowProgressHandler.get(): "
     
@@ -1378,16 +1361,15 @@ class ShowProgressHandler(webapp2.RequestHandler):
             user = users.get_current_user()
             
             user_email = user.email()
-            is_admin_user = users.is_current_user_admin()
             
-            display_link_to_production_server = False
+            display_link_to_production_server = False # pylint: disable=invalid-name
             if not self.request.host in settings.PRODUCTION_SERVERS:
                 # logging.debug(fn_name + "Running on limited-access server")
                 if settings.DISPLAY_LINK_TO_PRODUCTION_SERVER:
-                    display_link_to_production_server = True
+                    display_link_to_production_server = True # pylint: disable=invalid-name
                 if shared.is_test_user(user_email):
                     # Allow test user to see normal page
-                    display_link_to_production_server = False
+                    display_link_to_production_server = False # pylint: disable=invalid-name
                 else:
                     logging.info(fn_name + "Rejecting non-test user [" + str(user_email) + "] on limited access server")
                     logservice.flush()
@@ -1415,7 +1397,7 @@ class ShowProgressHandler(webapp2.RequestHandler):
                 data_row_num = 0
                 total_num_rows_to_process = 0
                 job_start_timestamp = None
-                job_execution_time = None
+                # job_execution_time = None
                 import_tasklist_suffix = None
                 job_msg = None
                 import_method = None
@@ -1432,7 +1414,7 @@ class ShowProgressHandler(webapp2.RequestHandler):
                 data_row_num = process_tasks_job.data_row_num
                 total_num_rows_to_process = process_tasks_job.total_num_rows_to_process
                 job_start_timestamp = process_tasks_job.job_start_timestamp # UTC
-                job_execution_time = datetime.datetime.now() - job_start_timestamp
+                # job_execution_time = datetime.datetime.now() - job_start_timestamp
                 import_tasklist_suffix = process_tasks_job.import_tasklist_suffix
                 job_msg = process_tasks_job.message
                 import_method = process_tasks_job.import_method
@@ -1577,9 +1559,19 @@ class ShowProgressHandler(webapp2.RequestHandler):
                                'app_version' : appversion.version,
                                'upload_timestamp' : appversion.upload_timestamp}
             self.response.out.write(template.render(path, template_values))
+            
+            if error_message:
+                if error_message_extra:
+                    shared.send_email_to_support("Progress - error msg to user", 
+                        error_message + '\n' + error_message_extra)
+                else:
+                    shared.send_email_to_support("Progress - error msg to user", error_message)
+                    
             logging.debug(fn_name + "<End>")
             logservice.flush()
-        except Exception, e:
+            
+            
+        except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught top-level exception")
             shared.serve_outer_exception_message(self, e)
             logging.debug(fn_name + "<End> due to exception" )
@@ -1657,7 +1649,7 @@ def _job_has_stalled(process_tasks_job):
     return False
 
     
-app = webapp2.WSGIApplication(
+app = webapp2.WSGIApplication( # pylint: disable=invalid-name
     [
         ("/robots.txt",                             RobotsHandler),
         (settings.WELCOME_PAGE_URL,                 WelcomeHandler),

@@ -1,11 +1,16 @@
-# This file is machine-generated. Only modify 'version' values.
+# This file is machine-generated. Only modify 'version' or 'dev_version' values.
+# 
 # The 'version' string format is
-#     major.minor.revision
-# major and minor can be any characters except a period (.)
+#     major.minor.revision OR  major.minor.version.revision
+# major, minor and version can be any characters except a period (.)
 #     e.g., version = 'beta 0.0-xy.123' is valid
 # revision must be a decimal integer
-# Each time write_version.py is run;
-#   - revision (3rd part of 'version' string) is incremented by 1
+# Each time update_appversion_values.py is run;
+#   - revision (last part of 'version' string) is incremented by 1
 #   - 'upload_timestamp' is automatically generated
-version = 'beta 0.6.003'
-upload_timestamp = '2015-06-16 23:04'
+# 
+version = '0.7.020'
+upload_timestamp = '2019-05-26 22:11'
+app_yaml_version = 'test'
+app_yaml_application = 'import-tasks'
+serving_url = 'https://test-dot-import-tasks.appspot.com'
