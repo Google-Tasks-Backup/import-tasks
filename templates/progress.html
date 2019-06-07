@@ -214,19 +214,27 @@ Uses status constants: STARTING, INITIALISING, IMPORTING, IMPORT_COMPLETED, ERRO
             {% if status == STALLED %}
                 <div class="break">
                     <div class="take-note-larger medium-break comment">
-                        You may try to restart the stalled job. If the job cannot be restarted, please go to the main menu and import a new file.
+                        <p>
+                            The import process has stalled
+                        </p>
+                        <p>
+                            Please click the button to restart the stalled import
+                        </p>
                     </div>
                     <form>
                         <input type="button" class="big-button" onClick="window.location.href = '{{ continue_job_url }}'" 
-                            value="Try to restart stalled import">
+                            value="Restart stalled import">
                     </form>
+                    <p>
+                        If the stalled import cannot be restarted, please go to the main menu and start again
+                    </p>
                 </div>
             {% endif %}   
             
             {% if status == IMPORT_COMPLETED or status == STALLED or status == ERROR or error_message %}
                 <form>
                     <input type="button" class="big-button" onClick="window.location.href = '{{ url_main_page }}'" 
-                        value="Return to main page">
+                        value="Return to main menu">
                 </form>
             {% endif %}   
             

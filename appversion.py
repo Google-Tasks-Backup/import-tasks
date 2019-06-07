@@ -9,8 +9,8 @@
 #   - revision (last part of 'version' string) is incremented by 1
 #   - 'upload_timestamp' is automatically generated
 # 
-version = '0.7.020'
-upload_timestamp = '2019-05-26 22:11'
-app_yaml_version = 'test'
+version = '0.8.014'
+upload_timestamp = '2019-06-08 00:23'
+app_yaml_version = 'gti-0-8-014'
 app_yaml_application = 'import-tasks'
-serving_url = 'https://test-dot-import-tasks.appspot.com'
+serving_url = 'https://gti-0-8-014-dot-import-tasks.appspot.com'

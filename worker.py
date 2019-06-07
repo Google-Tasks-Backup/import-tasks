@@ -32,7 +32,6 @@
 # ------------------
 import logging
 import pickle
-import json
 import datetime
 import time
 
@@ -307,7 +306,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                     
                     retry_count = settings.NUM_API_TRIES
                     while retry_count > 0:
-                        retry_count = retry_count - 1
+                        retry_count -= 1
                         # Accessing tasklists & tasks services may take some time (especially if retries due to 
                         # DeadlineExceeded), so update progress so that job doesn't stall
                         self._update_progress("Connecting to server ...")  # Update progress so that job doesn't stall
@@ -585,14 +584,43 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
         
             dummy_parent_id = ''
             dummy_previous_id = ''
+            log_this_detailed = False # TESTING - If True, the current row is logged in detail
+            log_all_detailed = False # TESTING - If True, all subsequent rows are logged in detail
             
             for task_row_data in tasks_data:
                 self.import_job_state.data_row_num += 1
                 self.import_job_state.num_tasks_in_list += 1
                 
+                # TESTING: If log_all_detailed is False, we set log_this_detailed True on a per-row basis
+                log_this_detailed = log_all_detailed 
+                
+                 # TESTING +++
+                if self.is_test_user:
+                    title = task_row_data.get('title', '')
+                    if title.endswith("LOG_THIS"):
+                        logging.debug("{}DEBUG: ENABLED 'log_this_detailed' for row {}".format(
+                            fn_name,
+                            self.import_job_state.data_row_num))
+                        log_this_detailed = True
+                 # TESTING ---
+                 
+                # -----------------------------------------------------
+                #       Check if task is deleted or hidden
+                # -----------------------------------------------------
+                # If a task has been deleted or hidden;
+                #   Don't use this task as a parent
+                #   Don't use this task as a sibling
+                #   Don't set 'parent' or 'previous' when inserting this task
+                task_is_deleted_or_hidden = (
+                    shared.is_truthy(task_row_data.get('deleted', False)) or
+                    shared.is_truthy(task_row_data.get('hidden', False))
+                )
+                
                 # -------------------------------------------
                 #       Check for valid 'status' value
                 # -------------------------------------------
+                # TODO: Move this check to import_tasks.py, so that it can be checked before
+                #       the import job is started.
                 status = task_row_data.get('status')
                 if status not in ('completed', 'needsAction'):
                     self._report_error("Invalid status value '" + unicode(status) + 
@@ -603,20 +631,23 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                     logservice.flush()
                     return 
                     
-                    
-                # ---------------------------------
-                #       Retrieve depth value. 
-                # ---------------------------------
-                # Use the same method that is used to check for valid depth values when the user uploads the file, 
-                # but don't compare with previous row, because that was already done when file was uploaded.
-                result, depth, err_msg1, err_msg2 = check_task_values.depth_is_valid(
-                    task_row_data, self.import_job_state.data_row_num, self.is_test_user)
-                if not result:
-                    self._report_error(err_msg1 + ": " + err_msg2, log_as_invalid_data=True)
-                    logging.info(fn_name + constants.INVALID_FORMAT_LOG_LABEL + 
-                        "<End> due to invalid 'depth' value")
-                    logservice.flush()
-                    return
+                if task_is_deleted_or_hidden:
+                    # Deleted and hidden tasks have no parent
+                    depth = 0                
+                else:
+                    # ---------------------------------
+                    #       Retrieve depth value. 
+                    # ---------------------------------
+                    # Use the same method that is used to check for valid depth values when the user uploads the file, 
+                    # but don't compare with previous row, because that was already done when file was uploaded.
+                    result, depth, err_msg1, err_msg2 = check_task_values.depth_is_valid(
+                        task_row_data, self.import_job_state.data_row_num, self.is_test_user)
+                    if not result:
+                        self._report_error(err_msg1 + ": " + err_msg2, log_as_invalid_data=True)
+                        logging.info(fn_name + constants.INVALID_FORMAT_LOG_LABEL + 
+                            "<End> due to invalid 'depth' value")
+                        logservice.flush()
+                        return
                 
                 if task_row_data.has_key('depth'):
                     # Delete the depth property, because it is not used by the server
@@ -635,6 +666,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                         "<End> due to missing 'tasklist_name' value")
                     logservice.flush()
                     return 
+                    
                 # 'tasklist_name' is not part of the Tasks resource, so delete it from the dictionary
                 del task_row_data['tasklist_name']
                 
@@ -705,7 +737,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                             
                             retry_count = settings.NUM_API_TRIES
                             while retry_count > 0:
-                                retry_count = retry_count - 1
+                                retry_count -= 1
                                 try:
                                     # -------------------
                                     # Insert the tasklist
@@ -717,15 +749,15 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                                     if self.is_test_user:
                                         logging.debug(fn_name + "TEST: Created new Tasklist [" + unicode(result['title']) + 
                                            "], ID = " + self.import_job_state.tasklist_id)
-                                        logging.debug(fn_name + "TEST: DEBUG: result ==>")
-                                        logging.debug(result)
+                                        logging.debug(fn_name + "TEST: DEBUG: tasklist insert result ==>")
+                                        shared.log_content_as_json('tasklist insert result', result)
                                         logservice.flush()
                                     break # Success
                                         
                                 except apiclient_errors.HttpError as http_err:
                                     if retry_count == 0 and http_err.resp.status == 400:
                                         # There have been 2 types of 400 error; "Bad Request" and "Invalid Value"
-                                        # "Invalid Value" can be caused by having a taklist name > 256 character,
+                                        # "Invalid Value" can be caused by having a tasklist name > 256 character,
                                         # which is being checked in the frontend as of 2013-06-05.
                                         # Log details of the tasklist body that caused the HttpError 400 error in order
                                         # to allow analysis of other possible causes of this error.
@@ -734,7 +766,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                                         logservice.flush()
                                         try:
                                             logging.debug("DEBUG: Tasklist body ==>")
-                                            logging.debug(tasklist)
+                                            shared.log_content_as_json('tasklist body', tasklist)
                                         except Exception, http_err: # pylint: disable=broad-except
                                             logging.exception(fn_name + "DEBUG: Exception logging tasklist body")
                                         logservice.flush()    
@@ -782,7 +814,8 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                 if import_method == constants.ImportMethod.SKIP_DUPLICATE_TASKLIST and skip_this_list:
                     # Tasklist exists, so do not import tasks in this tasklist
                     if self.is_test_user:
-                        logging.debug(fn_name + "TEST: Skipping data row " + str(self.import_job_state.data_row_num) + " because tasklist '" + 
+                        logging.debug(fn_name + "TEST: Skipping data row " + 
+                            str(self.import_job_state.data_row_num) + " because tasklist '" + 
                             tasklist_name + "' already exists")
                         logservice.flush()
                     continue
@@ -801,66 +834,76 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                     # Replace \n with an actual newline
                     # '\\n' matches '\n' in the imported string 
                     task_row_data['notes'] = notes.replace('\\n', '\n')
+                    
+                    
+                # ----------------------------------------------------------------------
+                #   Enable detailed logging if test user has key phrase in notes
+                # ----------------------------------------------------------------------
+                if self.is_test_user and notes and notes == "#!~TESTING:LOG_ALL_DETAILED":
+                    logging.debug(fn_name + "DEBUG: ENABLED 'log_all_detailed'")
+                    log_all_detailed = True
+                    log_this_detailed = True
+                    
+                if not task_is_deleted_or_hidden:
+                    # -----------------------------------------------------------
+                    #       Check depth and find current task's parent ID
+                    # -----------------------------------------------------------
+                    # Check for valid depth value
+                    # Valid depth values:
+                    #   depth = 0                   Root task
+                    #   depth < self.import_job_state.prev_depth          Task moved back up the task tree
+                    #   depth == self.import_job_state.prev_depth         Sibling task (same parent as previous task)
+                    #   depth == self.import_job_state.prev_depth + 1     New child task
+                    # Task depth must not be more than self.import_job_state.prev_depth + 1
+                    # List of self.import_job_state.parents_ids is updated after task has been added, 
+                    # because the current task may be the parent of the next task
+                    if depth > self.import_job_state.prev_depth+1:
+                        # Child can only be immediate child of previous task (i.e., previous depth + 1)
+                        self._report_error("Invalid depth value [" + str(depth) + "] in data row " + 
+                            str(self.import_job_state.data_row_num) + 
+                            " is more than 1 greater than previous task's depth [" + 
+                            str(self.import_job_state.prev_depth) + "]",
+                            log_as_invalid_data=True)
+                        logging.info(fn_name + constants.INVALID_FORMAT_LOG_LABEL + "<End> (invalid depth value)")
+                        logservice.flush()
+                        return 
                 
-                # -----------------------------------------------------------
-                #       Check depth and find current task's parent ID
-                # -----------------------------------------------------------
-                # Check for valid depth value
-                # Valid depth values:
-                #   depth = 0                   Root task
-                #   depth < self.import_job_state.prev_depth          Task moved back up the task tree
-                #   depth == self.import_job_state.prev_depth         Sibling task (same parent as previous task)
-                #   depth == self.import_job_state.prev_depth + 1     New child task
-                # Task depth must not be more than self.import_job_state.prev_depth + 1
-                # List of self.import_job_state.parents_ids is updated after task has been added, 
-                # because the current task may be the parent of the next task
-                if depth > self.import_job_state.prev_depth+1:
-                    # Child can only be immediate child of previous task (i.e., previous depth + 1)
-                    self._report_error("Invalid depth value [" + str(depth) + "] in data row " + 
-                        str(self.import_job_state.data_row_num) + 
-                        " is more than 1 greater than previous task's depth [" + 
-                        str(self.import_job_state.prev_depth) + "]",
-                        log_as_invalid_data=True)
-                    logging.info(fn_name + constants.INVALID_FORMAT_LOG_LABEL + "<End> (invalid depth value)")
-                    logservice.flush()
-                    return 
-                
-                # -------------------------
-                #    Find parent task ID
-                # -------------------------
-                if depth > len(self.import_job_state.parents_ids)-1:
-                    # This could be because 1st task in a new tasklist has a depth > 0
-                    self._report_error("Invalid depth [" + str(depth) + "] for task in data row " + 
-                        str(self.import_job_state.data_row_num) + "; No parent task at depth " + str(depth-1),
-                        log_as_invalid_data=True)
-                    logging.info(fn_name + constants.INVALID_FORMAT_LOG_LABEL + "<End> (No immmediate parent)")
-                    logservice.flush()
-                    return 
-                
-                try:
-                    # parent_id will be empty string for root tasks (depth = 0)
-                    self.import_job_state.parent_id = self.import_job_state.parents_ids[depth]
-                except Exception, e: # pylint: disable=broad-except
-                    self._report_error("Unable to find parent ID for task in data row " + 
-                        str(self.import_job_state.data_row_num) + " with depth [" + str(depth) + 
-                        "]; Unable to determine parent. Previous task's depth was " + 
-                        str(self.import_job_state.prev_depth) + 
-                        " Exception: " + shared.get_exception_msg(e))
-                    logging.warning(fn_name + "<End> (Error retrieving parent ID)")
-                    logservice.flush()
-                    return 
-                
-                # Find sibling (previous) ID
-                if depth == self.import_job_state.prev_depth + 1:
-                    # Going deeper, so this is the first child at the new depth, within this branch of the tree.
-                    # There is nowhere else that this task can go, so use a blank sibling ID (otherwise insert() throws an error)
-                    self.import_job_state.sibling_id = ''
-                elif depth+1 > len(self.import_job_state.sibling_ids):
-                    # First task at this depth
-                    self.import_job_state.sibling_id = ''
-                else:
-                    # Previous task at this depth
-                    self.import_job_state.sibling_id = self.import_job_state.sibling_ids[depth]
+                    # -------------------------
+                    #    Find parent task ID
+                    # -------------------------
+                    if depth > len(self.import_job_state.parents_ids)-1:
+                        # This could be because 1st task in a new tasklist has a depth > 0
+                        self._report_error("Invalid depth [" + str(depth) + "] for task in data row " + 
+                            str(self.import_job_state.data_row_num) + "; No parent task at depth " + str(depth-1),
+                            log_as_invalid_data=True)
+                        logging.info(fn_name + constants.INVALID_FORMAT_LOG_LABEL + "<End> (No immmediate parent)")
+                        logservice.flush()
+                        return 
+                    
+                    try:
+                        # parent_id will be empty string for root tasks (depth = 0)
+                        self.import_job_state.parent_id = self.import_job_state.parents_ids[depth]
+                    except Exception, e: # pylint: disable=broad-except
+                        self._report_error("Unable to find parent ID for task in data row " + 
+                            str(self.import_job_state.data_row_num) + " with depth [" + str(depth) + 
+                            "]; Unable to determine parent. Previous task's depth was " + 
+                            str(self.import_job_state.prev_depth) + 
+                            " Exception: " + shared.get_exception_msg(e))
+                        logging.warning(fn_name + "<End> (Error retrieving parent ID)")
+                        logservice.flush()
+                        return 
+                    
+                    # Find sibling (previous) ID
+                    if depth == self.import_job_state.prev_depth + 1:
+                        # Going deeper, so this is the first child at the new depth, within this branch of the tree.
+                        # There is nowhere else that this task can go, so use a blank sibling ID (otherwise insert() throws an error)
+                        self.import_job_state.sibling_id = ''
+                    elif depth+1 > len(self.import_job_state.sibling_ids):
+                        # First task at this depth
+                        self.import_job_state.sibling_id = ''
+                    else:
+                        # Previous task at this depth
+                        self.import_job_state.sibling_id = self.import_job_state.sibling_ids[depth]
                 
                 # -------------------------------------------------------------------------------------
                 #           Delete any empty properties, to prevent server throwing an error
@@ -917,7 +960,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                 # Retry, to handle occasional API timeout
                 retry_count = settings.NUM_API_TRIES
                 while retry_count > 0:
-                    retry_count = retry_count - 1
+                    retry_count -= 1
                     # ------------------------------------------------------
                     #       Update progress so that job doesn't stall
                     # ------------------------------------------------------
@@ -941,10 +984,19 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                         if sibling_id == '':
                             sibling_id = None
                             
+                        if task_is_deleted_or_hidden:
+                            # A deleted or hidden task has no parent or sibling
+                            parent_id = None
+                            sibling_id = None
+                        
+                            
                         # TESTING +++
                         if self.is_test_user:
                             if notes and notes.startswith("#!~TESTING:") and len(notes) == 13:
-                                logging.debug(fn_name + "TESTING: Found TESTING: command for test user")
+                                logging.debug("{}TESTING: Found 'TESTING:' command for test user {} at row {}".format(
+                                    fn_name,
+                                    self.user_email,
+                                    self.import_job_state.data_row_num))
                                 # Force 'parent' and 'previous' values if 'notes' contains specific text;
                                 #   "#!~TESTING:??"
                                 # where "??" is a 2-char string, where each char can be one of;
@@ -971,7 +1023,8 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                                         fn_name, parent_id))
                                 elif parent_control == 'n':
                                     parent_id = None
-                                    logging.debug("{}TESTING:     Setting parent ID to None for test user")
+                                    logging.debug("{}TESTING:     Setting parent ID to None for test user".format(
+                                        fn_name))
                                 
                                 if sibling_control == 'p' and dummy_previous_id:
                                     sibling_id = dummy_previous_id
@@ -987,8 +1040,22 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                                         fn_name, sibling_id))
                                 elif sibling_control == 'n':
                                     sibling_id = None
-                                    logging.debug("{}TESTING:     Setting sibling ID to None for test user")
+                                    logging.debug("{}TESTING:     Setting sibling ID to None for test user".format(
+                                        fn_name))
                         # TESTING ---
+                        
+                        if log_this_detailed:
+                            logging.debug("{}TESTING: LOG_THIS: tasklist ID = {}".format(
+                                fn_name, self.import_job_state.tasklist_id))
+                            logging.debug("{}TESTING: LOG_THIS: parent ID = {}".format(
+                                fn_name, parent_id))
+                            logging.debug("{}TESTING: LOG_THIS: previous ID = {}".format(
+                                fn_name, sibling_id))
+                            logging.debug("{}TESTING: LOG_THIS: task_row_data being inserted from row {} ==>".format(
+                                fn_name,
+                                self.import_job_state.data_row_num))
+                            shared.log_content_as_json('task_row_data', task_row_data)
+                                
                                                    
                         # ===============
                         # Insert the task
@@ -998,31 +1065,39 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                                                        parent=parent_id, 
                                                        previous=sibling_id).execute()
                         
-                        task_id = result['id']
+                        if log_this_detailed:
+                            logging.debug(fn_name + "TESTING: LOG_THIS: result from tasks_svc.insert() ==>")
+                            shared.log_content_as_json('task insert result', result)
+                                
+                        task_id = result.get('id', None)
                         
                         if not task_id:
                             logging.error(fn_name + "No id returned for task insert for " +
-                                self.user_email + " ==>")
-                            try:
-                                logging.error(result)
-                            except Exception, e: # pylint: disable=broad-except
-                                logging.error(fn_name + "Unable to log insert result:" + shared.get_exception_msg(e))
+                                self.user_email + ", task insert result ==>")
+                            shared.log_content_as_json('task insert result', result)
                             logservice.flush()
                             raise Exception("No id returned for task insert")
                             
-                        if notes and notes == "#!~TESTING:STORE_AS_DUMMY_PREVIOUS":
-                            logging.debug("{}TESTING: Storing dummy previous ID '{}'".format(
-                                fn_name, task_id))
-                            dummy_previous_id = task_id
-
-                        if notes and notes == "#!~TESTING:STORE_AS_DUMMY_PARENT":
-                            logging.debug("{}TESTING: Storing dummy parent ID '{}'".format(
-                                fn_name, task_id))
-                            dummy_parent_id = task_id
-
-                            
                         self.import_job_state.num_of_imported_tasks += 1
                         
+                        if self.is_test_user and notes:
+                            if notes == "#!~TESTING:STORE_AS_DUMMY_PREVIOUS":
+                                logging.debug("{}TESTING: Storing dummy previous ID '{}' from row {} for test user {}".format(
+                                    fn_name, 
+                                    task_id,
+                                    self.import_job_state.data_row_num,
+                                    self.user_email))
+                                dummy_previous_id = task_id
+
+                            if notes and notes == "#!~TESTING:STORE_AS_DUMMY_PARENT":
+                                logging.debug("{}TESTING: Storing dummy parent ID '{}' from row {} for test user {}".format(
+                                    fn_name, 
+                                    task_id,
+                                    self.import_job_state.data_row_num,
+                                    self.user_email))
+                                dummy_parent_id = task_id
+
+                            
                         # msg = "Imported " + str(self.import_job_state.num_of_imported_tasks) + " of " + str(self.process_tasks_job.total_num_rows_to_process) + " data rows."
                         # if self.import_job_state.num_of_imported_tasks == 1:
                             # self._update_progress(msg, force=True) # Force 1st update so user sees some progress
@@ -1034,30 +1109,27 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                         else:
                             self._update_progress()
 
-                        # Succeeded, so continue
+                        # Task insert succeeded, so break out of the retry loop
                         break
                     
                     except KeyError:
                         # This usually indicates that the result did not return a valid task object
                         logging.exception(fn_name + "KeyError inserting task for data row for " + 
                             self.user_email +
-                            str(self.import_job_state.data_row_num) + ", result ==>")
-                        try:
-                            logging.error(result)
-                        except Exception, ex1: # pylint: disable=broad-except
-                            logging.error(fn_name + "Unable to log insert result:" + shared.get_exception_msg(ex1))
+                            str(self.import_job_state.data_row_num) + ", task insert result ==>")
+                        shared.log_content_as_json('task insert result', result)
                         logging.debug(fn_name +     "  Retry count = " + str(retry_count))
                         logservice.flush()
                     
                     except apiclient_errors.HttpError as http_err:
                         if self.is_test_user:
                             # DEBUG
-                            logging.debug(fn_name + "TEST: DEBUG: HttpError inserting task: " + 
+                            logging.debug(fn_name + "TEST: HttpError DEBUG: HttpError inserting task: " + 
                                 shared.get_exception_msg(http_err))
-                            logging.debug(fn_name + "TEST: DEBUG: task data ==>")
-                            logging.debug(task_row_data)
-                            logging.debug(fn_name + "TEST: DEBUG: result ==>")
-                            logging.debug(result)
+                            logging.debug(fn_name + "TEST: HttpError DEBUG: task data ==>")
+                            shared.log_content_as_json('task_row_data', task_row_data)
+                            logging.debug(fn_name + "TEST: HttpError DEBUG: task insert result ==>")
+                            shared.log_content_as_json('task insert result', result)
                             
                         if retry_count == 0:
                             logging.exception(fn_name + 
@@ -1067,7 +1139,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                             logging.debug("{}parent_id = {}".format(fn_name, parent_id))
                             logging.debug("{}sibling_id = {}".format(fn_name, sibling_id))
                             
-                            if http_err._get_reason() and http_err._get_reason().lower() == "Invalid Value": # pylint: disable=protected-access
+                            if http_err._get_reason() and http_err._get_reason().lower() == "invalid value": # pylint: disable=protected-access
                                 # The Tasks API doesn't indicate which value is invalid, 
                                 # so try to log the 'body', in case that contains an invalid value.
                                 # We first try to log as JSON, because that is the format that
@@ -1075,26 +1147,8 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                                 # We also log the repr and the raw values, to give us the maximum 
                                 # possible representations to help find the cause of the 
                                 # "Invalid Value" message.
-                                try:
-                                    try:
-                                        logging.debug("{}task_row_data (json) = {}".format(
-                                            fn_name, json.dumps(task_row_data, indent=4)))
-                                    except Exception as json_parse_ex: # pylint: disable=broad-except
-                                        logging.info("{}Unable to log task_row_data as JSON: {}".format(
-                                            fn_name, 
-                                            shared.get_exception_msg(json_parse_ex)))
-                                except: # pylint: disable=bare-except
-                                    pass
-                                try:
-                                    logging.debug("{}task_row_data (repr) = {}".format(
-                                        fn_name, repr(task_row_data)))
-                                except: # pylint: disable=bare-except
-                                    pass
-                                try:
-                                    logging.debug("{}task_row_data (raw) = {}".format(
-                                        fn_name, task_row_data))
-                                except: # pylint: disable=bare-except
-                                    pass
+                                logging.warning(fn_name + "HttpError reason = 'Invalid Value', so logging task_row_data ==>")
+                                shared.log_content_as_json('task_row_data', task_row_data)
                             
                             _log_job_state(self.import_job_state)
                             
@@ -1250,38 +1304,48 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                 # If an .insert() fails, we need to re-create the missing task
                 # We then need to update the parents_ids and sibling_ids with the new task ID 
                 
-                self.import_job_state.prev_tasks_data = { 'id' : task_id, 
-                    'tasklist_id' : self.import_job_state.tasklist_id, 
-                    'task_row_data' : task_row_data, 
-                    'parent_id' : self.import_job_state.parent_id, 
-                    'sibling_id' : self.import_job_state.sibling_id }
-                
-                
-                # --------------------------------------------
-                #           Update list of parent IDs
-                # --------------------------------------------
-                # List of self.import_job_state.parents_ids is updated after task has been added, because the current task may be the parent of the next task
-                if depth < self.import_job_state.prev_depth:
-                    # Child of an earlier task, so we've moved back up the task tree
-                    # Delete ID of 'deeper' tasks, because those tasks cannot be parents anymore
-                    del self.import_job_state.parents_ids[depth+1:]
-                # Store ID of current task in at this depth, as it could be the parent of a future task
-                if len(self.import_job_state.parents_ids) == depth+2:
-                    self.import_job_state.parents_ids[depth+1] = task_id
+                if task_is_deleted_or_hidden:
+                    # Don't save the details of this deleted or hidden task, 
+                    # as a deleted or hidden task cannot be used as a parent or sibling
+                    if self.is_test_user:
+                        logging.debug("{}NOT setting prev_tasks_data, because the task from row {} is a deleted or hidden task".format(
+                            fn_name,
+                            self.import_job_state.data_row_num))
                 else:
-                    self.import_job_state.parents_ids.append(task_id)
+                    # This is a non-deleted, non-hidden task, so save the details so that this task
+                    # can (potentially) be used as the parent or sibling of the next task.
+                    self.import_job_state.prev_tasks_data = { 'id' : task_id, 
+                        'tasklist_id' : self.import_job_state.tasklist_id, 
+                        'task_row_data' : task_row_data, 
+                        'parent_id' : self.import_job_state.parent_id, 
+                        'sibling_id' : self.import_job_state.sibling_id }
+                    
+                    
+                    # --------------------------------------------
+                    #           Update list of parent IDs
+                    # --------------------------------------------
+                    # List of self.import_job_state.parents_ids is updated after task has been added, because the current task may be the parent of the next task
+                    if depth < self.import_job_state.prev_depth:
+                        # Child of an earlier task, so we've moved back up the task tree
+                        # Delete ID of 'deeper' tasks, because those tasks cannot be parents anymore
+                        del self.import_job_state.parents_ids[depth+1:]
+                    # Store ID of current task in at this depth, as it could be the parent of a future task
+                    if len(self.import_job_state.parents_ids) == depth+2:
+                        self.import_job_state.parents_ids[depth+1] = task_id
+                    else:
+                        self.import_job_state.parents_ids.append(task_id)
 
-                # --------------------------------------------------------------------------
-                #       Store ID of this task as sibling for next task at this depth
-                # --------------------------------------------------------------------------
-                if len(self.import_job_state.sibling_ids) < depth+1:
-                    # First task at this depth
-                    self.import_job_state.sibling_ids.append(task_id)
-                else:
-                    # There was a previous task at this depth
-                    self.import_job_state.sibling_ids[depth] = task_id
+                    # --------------------------------------------------------------------------
+                    #       Store ID of this task as sibling for next task at this depth
+                    # --------------------------------------------------------------------------
+                    if len(self.import_job_state.sibling_ids) < depth+1:
+                        # First task at this depth
+                        self.import_job_state.sibling_ids.append(task_id)
+                    else:
+                        # There was a previous task at this depth
+                        self.import_job_state.sibling_ids[depth] = task_id
 
-                self.import_job_state.prev_depth = depth
+                    self.import_job_state.prev_depth = depth
                 
                     
                 # ==============================================================================
@@ -1292,6 +1356,8 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                 run_time = datetime.datetime.now() - self.run_start_time
                 run_seconds = run_time.seconds
                 if run_seconds > settings.MAX_WORKER_RUN_TIME:
+                    logging.info("{}NOTE: Worker has been running for {} seconds, so starting a new worker".format(
+                        fn_name, run_seconds))
                     self._start_another_worker(run_time, run_seconds)
                     return
             
@@ -1333,8 +1399,9 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                         default_tasklist = self._get_default_tasklist()
                         default_tasklist['title'] = self.import_job_state.default_tasklist_orig_name
                         
+                        retry_count = settings.NUM_API_TRIES
                         while retry_count > 0:
-                            retry_count = retry_count - 1
+                            retry_count -= 1
                             self._update_progress()  # Update progress so that job doesn't stall
                             
                             try:
@@ -1601,7 +1668,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
         # Retry, to handle occasional API timeout
         retry_count = settings.NUM_API_TRIES
         while retry_count > 0:
-            retry_count = retry_count - 1
+            retry_count -= 1
             self._update_progress()  # Update progress so that job doesn't stall
 
             try:
@@ -1716,7 +1783,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
         while more_tasklists_data_to_retrieve:
             retry_count = settings.NUM_API_TRIES
             while retry_count > 0:
-                retry_count = retry_count - 1
+                retry_count -= 1
                 # ------------------------------------------------------
                 #       Update progress so that job doesn't stall
                 # ------------------------------------------------------
@@ -1738,7 +1805,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
         
             if self.is_test_user and settings.DUMP_DATA:
                 logging.debug(fn_name + "TEST: tasklists_data ==>")
-                logging.debug(tasklists_data)
+                shared.log_content_as_json('tasklists data', tasklists_data)
                 logservice.flush()
 
             if tasklists_data.has_key(u'items'):
@@ -1767,7 +1834,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
               
                 if self.is_test_user and settings.DUMP_DATA:
                     logging.debug(fn_name + "TEST: tasklist_data ==>")
-                    logging.debug(tasklist_data)
+                    shared.log_content_as_json('tasklist data', tasklist_data)
                     logservice.flush()
               
                 # Example of a tasklist entry;
@@ -1817,9 +1884,9 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
         
         retry_count = settings.NUM_API_TRIES
         while retry_count > 0:
+            retry_count -= 1
             # Find ID of default tasklist
             self._update_progress() # Update progress so that job doesn't stall
-            retry_count = retry_count - 1
             try:
                 default_tasklist = self.tasklists_svc.get(tasklist='@default').execute()
                 return default_tasklist # Success
@@ -1844,7 +1911,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
         
         retry_count = settings.NUM_API_TRIES
         while retry_count > 0:
-            retry_count = retry_count - 1
+            retry_count -= 1
             self._update_progress()  # Update progress so that job doesn't stall
             try:
                 if tasklist_id == self.import_job_state.default_tasklist_id:
@@ -1974,8 +2041,9 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
         
         # import_job_state may be None, depending on when the error occurs, so only access the variable if it has a value
         if self.import_job_state:
-            # Current data row was NOT processed, so change data_row_num so it now refers to last successfully imported row
-            # data_row_num is incremented at the start of the task processing loop
+            # data_row_num is incremented at the start of the task processing loop, but the
+            # current data row was NOT processed, so change data_row_num so that it now refers to 
+            # the last successfully imported row number.
             self.process_tasks_job.data_row_num = self.import_job_state.data_row_num - 1
             self.process_tasks_job.total_progress = self.import_job_state.num_of_imported_tasks
         _log_job_state(self.import_job_state) # Log job state info
@@ -1985,7 +2053,8 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
         # Import process terminated, so delete the blobstore
         import_tasks_shared.delete_blobstore(self.blob_info)
         
-        shared.send_email_to_support("Worker - error msg to user", err_msg)
+        shared.send_email_to_support("Worker - error msg to user", err_msg, 
+            job_start_timestamp=self.process_tasks_job.job_start_timestamp)
 
 
     def _handle_http_error(self, fn_name, e, retry_count, err_msg):
@@ -2014,16 +2083,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                     
                 # Try logging the content of the HTTP response, 
                 # in case it contains useful info to help debug the error
-                try:
-                    try:
-                        parsed_json = json.loads(e.content)
-                        logging.info(fn_name + "HTTP error content as JSON =\n{}".format(
-                            json.dumps(parsed_json, indent=4)))
-                    except: # pylint: disable=bare-except
-                        logging.info(fn_name + "HTTP error content = '{}'".format(
-                            e.content))
-                except: # pylint: disable=bare-except
-                    pass
+                shared.log_content_as_json('http error content', e.content)
                     
                 logservice.flush()
                 self._report_error(err_msg)

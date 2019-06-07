@@ -24,6 +24,8 @@ import logging
 import traceback
 import Cookie
 import cgi
+import json
+from datetime import datetime
 
 
 from google.appengine.api import urlfetch
@@ -333,27 +335,37 @@ def reject_non_test_user(self):
         show_heading_messages=False)
                     
                     
-def send_email_to_support(subject, msg):
+def send_email_to_support(subject, msg, job_start_timestamp=None):
     fn_name = "send_email_to_support: "
     
     try:
         # TODO: Add date & time (or some random, unique ID) to subject so each subject is unique,
         # so that Gmail doesn't put them all in one conversation
-        subject = u"{} v{} ({}) - ERROR - {}".format(
-            host_settings.APP_TITLE,
-            appversion.version,
-            appversion.app_yaml_version,
-            subject)
+        
+        if job_start_timestamp:
+            subject = u"{} v{} ({}) - ERROR for job started at {} - {}".format(
+                host_settings.APP_TITLE,
+                appversion.version,
+                appversion.app_yaml_version,
+                job_start_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                subject)
+        else:
+            subject = u"{} v{} ({}) - ERROR at {} - {}".format(
+                host_settings.APP_TITLE,
+                appversion.version,
+                appversion.app_yaml_version,
+                datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                subject)
         
         if not settings.SUPPORT_EMAIL_ADDRESS:
-            logging.info(fn_name + "No support email address, so email not sent:")
-            logging.info(fn_name + "    Subject = {}".format(subject))
-            logging.info(fn_name + "    Msg = {}".format(msg))
+            logging.info(fn_name + u"No support email address, so email not sent:")
+            logging.info(fn_name + u"    Subject = {}".format(subject))
+            logging.info(fn_name + u"    Msg = {}".format(msg))
             return
             
-        logging.info(fn_name + "Sending support email:")
-        logging.info(fn_name + "    Subject = {}".format(subject))
-        logging.info(fn_name + "    Msg = {}".format(msg))
+        logging.info(fn_name + u"Sending support email:")
+        logging.info(fn_name + u"    Subject = {}".format(subject))
+        logging.info(fn_name + u"    Msg = {}".format(msg))
         
         sender = host_settings.APP_TITLE + " <noreply@" + get_application_id() + ".appspotmail.com>"
         
@@ -366,3 +378,108 @@ def send_email_to_support(subject, msg):
         logging.exception(fn_name + "Error sending support email")
         # logging.info(fn_name + "    Subject = {}".format(subject))
         # logging.info(fn_name + "    Msg = {}".format(msg))
+
+
+def log_content_as_json(label, content):
+    """ Log the content as JSON.
+    
+        If content is not JSON, try to convert content to JSON, then log it.
+    """
+    
+    fn_name = "log_content_as_json: "
+    
+    try:
+        logging.info(u"{} {} = {}".format(
+            fn_name,
+            label,
+            json.dumps(content, indent=4)))
+        return
+    except: # pylint: disable=bare-except
+        # No need to log anything here, as the content may be serialised JSON
+        pass
+        
+    try:
+        # Try to de-serialise content to JSON
+        parsed_json = json.loads(content)
+        logging.info(u"{} {} as JSON = {}".format(
+            fn_name,
+            label,
+            json.dumps(parsed_json, indent=4)))
+        return
+    except Exception as ex: # pylint: disable=broad-except
+        logging.warning("{}Unable to log {} as JSON: {}".format(
+            fn_name, 
+            label,
+            get_exception_msg(ex)))
+            
+    # Try logging repr() of content
+    try:
+        logging.info(u"{} {} (repr) = {}".format(
+            fn_name,
+            label,
+            repr(content)))
+        return
+    except Exception as ex: # pylint: disable=broad-except
+        logging.warning(u"{}Unable to log repr of {}: {}".format(
+            fn_name, 
+            label,
+            get_exception_msg(ex)))
+
+    # Try logging content, letting format() handle possible conversion
+    try:
+        logging.info(u"{} {} (raw) = {}".format(
+            fn_name,
+            label,
+            content))
+        return
+    except Exception as ex: # pylint: disable=broad-except
+        logging.warning(u"{}Unable to log {} as raw: {}".format(
+            fn_name, 
+            label,
+            get_exception_msg(ex)))
+
+
+def is_truthy(val):
+    """ Returns True if val has a value that could be interpreted as True.
+
+    An empty string returns False.
+
+    Note that for checkbox inputs in HTML forms;
+        If the field element has a value attribute specified,
+            then let value be the value of that attribute;
+        otherwise,
+            let value be the string "on".
+        If checkbox isn't checked then it doesn't contribute to the data sent on form submission.
+
+        So when getting the checkbox value in a POST handler, if value hasn't been set
+            val = self.request.get('element_name', '')
+        val will be 'on' if checkbox is checked, or empty string if checkbox is unchecked
+    """
+    
+    fn_name = "is_truthy: "
+
+    if isinstance(val, bool):
+        return val
+        
+    try:
+        # Try to interpret val as an integer
+        # Types/Values that are converted to non-zero values by int():
+        #   Float (e.g. 1.23)
+        #   String representation of an int (e.g. "1")
+        #   Boolean (e.g. True)
+        i = int(val)
+        # Return True if the value is non-zero
+        return i != 0
+    except: # pylint: disable=bare-except
+        # val is not a number (float or int), bool or string representation of an int
+        pass
+        
+    try:
+        # Try to interpret val as a string
+        return val.lower() in ['true', 'yes', 'y', 't', 'on', 'enable', 'enabled', 'checked', '1']
+    except Exception as ex: # pylint: disable=broad-except
+        logging.warning("{}Unable to parse '{}', so returning False: {}".format(
+            fn_name,
+            val,
+            get_exception_msg(ex)))
+        return False

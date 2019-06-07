@@ -1563,9 +1563,12 @@ class ShowProgressHandler(webapp2.RequestHandler):
             if error_message:
                 if error_message_extra:
                     shared.send_email_to_support("Progress - error msg to user", 
-                        error_message + '\n' + error_message_extra)
+                        error_message + '\n' + error_message_extra,
+                        job_start_timestamp=job_start_timestamp)
                 else:
-                    shared.send_email_to_support("Progress - error msg to user", error_message)
+                    shared.send_email_to_support("Progress - error msg to user", 
+                        error_message,
+                        job_start_timestamp=job_start_timestamp)
                     
             logging.debug(fn_name + "<End>")
             logservice.flush()

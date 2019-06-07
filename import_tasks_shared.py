@@ -17,7 +17,6 @@
 
 import logging
 import datetime
-import json
 
 from google.appengine.api import urlfetch
 from google.appengine.api import logservice # To flush logs
@@ -532,26 +531,7 @@ def task_exists(tasks_svc, tasklist_id, task_id):
         
         # Try logging the returned result to enable debugging.
         # 'result' should be a JSON object
-        try:
-            try:
-                logging.debug("{}DEBUG:     result (json) = {}".format(
-                    fn_name, json.dumps(result, indent=4)))
-            except Exception as json_parse_ex: # pylint: disable=broad-except
-                logging.info("{}DEBUG: Unable to log result as JSON: {}".format(
-                    fn_name, 
-                    shared.get_exception_msg(json_parse_ex)))
-        except: # pylint: disable=bare-except
-            pass
-        try:
-            logging.debug("{}DEBUG:     result (repr) = {}".format(
-                fn_name, repr(result)))
-        except: # pylint: disable=bare-except
-            pass
-        try:
-            logging.debug("{}DEBUG:     result (raw) = {}".format(
-                fn_name, result))
-        except: # pylint: disable=bare-except
-            pass
+        shared.log_content_as_json('retrieved task result', result)
         
         if result.get('kind') == 'tasks#task' and result.get('id') == task_id:
             try:

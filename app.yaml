@@ -10,8 +10,8 @@
 #version: gti-0-6-003
 #version: test-gti-0-6
 # version: gti-0-7
-# version: test
-version: gti-0-7-20
+version: test
+# version: gti-0-8-014
 
 # ===== Production server ======
 application: import-tasks
