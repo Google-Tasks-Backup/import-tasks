@@ -57,8 +57,8 @@ from apiclient.model import RawModel
 from apiclient.schema import Schemas
 from email.mime.multipart import MIMEMultipart
 from email.mime.nonmultipart import MIMENonMultipart
-from oauth2client.util import positional
-from oauth2client.anyjson import simplejson
+from common.util import positional
+from common.anyjson import simplejson
 
 logger = logging.getLogger(__name__)
 

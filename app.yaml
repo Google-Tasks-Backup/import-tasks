@@ -10,8 +10,8 @@
 #version: gti-0-6-003
 #version: test-gti-0-6
 # version: gti-0-7
-version: test
-# version: gti-0-8-014
+# version: test
+version: gti-0-10-008
 
 # ===== Production server ======
 application: import-tasks
@@ -32,7 +32,8 @@ skip_files:
 - ^\.idea
 - ^\.vs
 - ^\.vscode
-- ^archive$
+- ^[Aa]rchive$
+- ^Logs$
 - ^bin
 - ^obj
 - ^testing
@@ -62,20 +63,20 @@ default_expiration: "5m"
 
 libraries:
 - name: django
-  version: "1.2"
+  version: "1.4"
   
 
-error_handlers:
-  - file: error_handlers/error_default.html
+# error_handlers:
+  # - file: error_handlers/error_default.html
 
-  - error_code: over_quota
-    file: error_handlers/error_over_quota.html
+  # - error_code: over_quota
+    # file: error_handlers/error_over_quota.html
     
-  - error_code: dos_api_denial
-    file: error_handlers/error_dos.html
+  # - error_code: dos_api_denial
+    # file: error_handlers/error_dos.html
   
-  - error_code: timeout
-    file: error_handlers/error_timeout.html
+  # - error_code: timeout
+    # file: error_handlers/error_timeout.html
 
     
 handlers:

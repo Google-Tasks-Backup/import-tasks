@@ -32,16 +32,16 @@
 # ---------------------------------
 #   APP-SPECIFIC SETTINGS: Start
 # ---------------------------------
-url_discussion_group = "groups.google.com/group/MY-GROUP-NAME"
+url_discussion_group = "groups.google.com/group/MY-GROUP-NAME" # pylint: disable=invalid-name
 
-email_discussion_group = "MY-GROUP-NAME@googlegroups.com"
+email_discussion_group = "MY-GROUP-NAME@googlegroups.com" # pylint: disable=invalid-name
 
-url_issues_page = "code.google.com/p/MY-APP-ID/issues/list"
+url_issues_page = "code.google.com/p/MY-APP-ID/issues/list" # pylint: disable=invalid-name
 
-url_source_code = "code.google.com/p/MY-APP-ID/source/browse/"
+url_source_code = "code.google.com/p/MY-APP-ID/source/browse/" # pylint: disable=invalid-name
 
 # URL to direct people to if they wish to backup their tasks
-url_GTB = "MY-OTHER-APP-ID.appspot.com"
+url_GTB = "MY-OTHER-APP-ID.appspot.com" # pylint: disable=invalid-name
 
 # Email address to which critical errors are emailed
 # If blank, no email will be sent
@@ -166,4 +166,3 @@ PROGRESS_UPDATE_INTERVAL = 5
 
 # Refresh progress page every PROGRESS_PAGE_REFRESH_INTERVAL seconds
 PROGRESS_PAGE_REFRESH_INTERVAL = 6
-

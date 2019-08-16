@@ -20,6 +20,12 @@
 __author__ = "julie.smith.1999@gmail.com (Julie Smith)"
 
 
+
+import base64
+import quopri
+
+from webob import multidict
+
 from google.appengine.ext.webapp import template
 
 template.register_template_library("common.customdjango")
@@ -30,13 +36,7 @@ template.register_template_library("common.customdjango")
 # but does not fix the mangled filename in blob_info.filename
 #     From http://code.google.com/p/googleappengine/issues/detail?id=2749#c21
 
-import base64
-import quopri
-
-from webob import multidict
-
-
-def from_fieldstorage(cls, fs):
+def from_fieldstorage(cls, fs): # pylint: disable=invalid-name
     """
     Create a dict from a cgi.FieldStorage instance
     """
@@ -80,4 +80,3 @@ def from_fieldstorage(cls, fs):
 multidict.MultiDict.from_fieldstorage = classmethod(from_fieldstorage)
 
 # End FIX1
-

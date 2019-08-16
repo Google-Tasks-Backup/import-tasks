@@ -72,6 +72,10 @@ class PauseReason(object): # pylint: disable=too-few-public-methods
 # Max blob size is just under 1MB (~2^20), so use 1000000 to allow some margin for overheads
 MAX_BLOB_SIZE = 1000000
 
+# As of ~June 2019, Google is returning 'Invalid value' if 'notes' is more than 8,192 characters.
+# Each character is 16 bits, so some Unicode characters use more than 1 char.
+MAX_NOTES_LEN = 8192
+
 
 # Name of folder containg templates. Do not include path separator characters, as they are inserted by os.path.join()
 PATH_TO_TEMPLATES = "templates"
@@ -119,8 +123,28 @@ FULL_CSV_ELEMENT_LIST = ['tasklist_name', 'title', 'notes', 'status', 'due', 'co
 #   CSV may omit depth; worker will default to depth = 0
 MINIMUM_GTBAK_ELEMENT_LIST = [u'tasklist_name', u'title', u'status', u'depth']
 MINIMUM_CSV_ELEMENT_LIST = [u'tasklist_name', u'title', u'status']
+
+# There are 3 types of GTB 'Raw CSV' files;
+#   Raw CSV
+#       CSV file containing almost all available properties for each task.
+#       Saved by GTB as "tasks_raw_XXXX.csv"
+#   Raw CSV, formatted dates
+#       Same as Raw CSV, but with date/timestamps formatted suitable for reading by Excel.
+#       Saved by GTB as "tasks_raw1_XXXX.csv"
+#   Raw CSV, RFC3339 timestamps
+#       Same as Raw CSV, but also includes timestamps in RFC3339 format
+#       Saved by GTB as "tasks_raw2_XXXX.csv"
+# 'raw' and 'raw1' both have the same column names; only the format of the fields is different.
+# 'raw2' has extra columns.
     
-    
+GTB_RAW_COLUMN_NAMES_LISTS = [
+    # Column names used for 'raw' and 'raw1' files
+    ["tasklist","kind","id","etag","title","updated","selfLink","parent","position","notes","status","due","completed","deleted","hidden"],
+    # Column names used for 'raw2' files
+    ["tasklist","kind","id","etag","title","updated","updated_RFC3339","selfLink","parent","position","notes","status","due","due_RFC3339","completed","completed_RFC3339","deleted","hidden"]
+]
+
+
     
 
 VALID_FILE_FORMAT_MSG = "<div>Only <a href='/static/info.html#import_export_csv'>properly formatted CSV</a> or GTBak files are supported. " + \

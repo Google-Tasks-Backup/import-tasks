@@ -189,7 +189,13 @@ Uses status constants: STARTING, INITIALISING, IMPORTING, IMPORT_COMPLETED, ERRO
             {% if error_message %}
                 <br />
                 <div class="take-note break">
-                    {{ error_message }}
+                    {% if error_message_lines %}
+                        {% for error_message_line in error_message_lines %}
+                            {{ error_message_line }}<br>
+                        {% endfor %}
+                    {% else %}
+                        {{ error_message }}
+                    {% endif %}
                     {% if error_message_extra %}
                         <br />
                         <div style="font-family: 'Courier New', Courier, monospace; margin-top: 6px">

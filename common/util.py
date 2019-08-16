@@ -34,7 +34,7 @@ FLAGS = gflags.FLAGS
 
 gflags.DEFINE_enum('positional_parameters_enforcement', 'WARNING',
     ['EXCEPTION', 'WARNING', 'IGNORE'],
-    'The action when an oauth2client.util.positional declaration is violated.')
+    'The action when an common.util.positional declaration is violated.')
 
 
 def positional(max_positional_args):

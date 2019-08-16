@@ -7,7 +7,7 @@ extension-pkg-whitelist=
 
 # Add files or directories to the blacklist. They should be base names, not
 # paths.
-ignore=CVS
+ignore=CVS,Archive,.git,gflags.py,gflags_validators.py,__init__.py
 
 # Add files or directories matching the regex patterns to the blacklist. The
 # regex matches against base names, not paths.
@@ -18,6 +18,7 @@ ignore-patterns=
 init-hook=import sys; 
   sys.path.append(r"C:\Program Files (x86)\Google\google_appengine")
   sys.path.append(r"C:\Program Files (x86)\Google\google_appengine\lib\webapp2-2.5.2")
+  sys.path.append(r"C:\Program Files (x86)\Google\google_appengine\lib\webob-1.2.3")
 
 # Use multiple processes to speed up Pylint.
 jobs=1

@@ -18,7 +18,7 @@
 """Classes to represent Task import job"""
 
 from google.appengine.ext import db
-from oauth2client import appengine
+from oauth2client.contrib import appengine
 
 import constants
 

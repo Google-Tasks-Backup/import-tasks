@@ -1,10 +1,10 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#      http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Client library for using OAuth2, especially with Google APIs."""
+"""Contains Django URL patterns used for OAuth2 flow."""
 
-__version__ = '4.1.3'
+from django.conf import urls
 
-GOOGLE_AUTH_URI = 'https://accounts.google.com/o/oauth2/v2/auth'
-GOOGLE_DEVICE_URI = 'https://oauth2.googleapis.com/device/code'
-GOOGLE_REVOKE_URI = 'https://oauth2.googleapis.com/revoke'
-GOOGLE_TOKEN_URI = 'https://oauth2.googleapis.com/token'
-GOOGLE_TOKEN_INFO_URI = 'https://oauth2.googleapis.com/tokeninfo'
+from oauth2client.contrib.django_util import views
 
+urlpatterns = [
+    urls.url(r'oauth2callback/', views.oauth2_callback, name="callback"),
+    urls.url(r'oauth2authorize/', views.oauth2_authorize, name="authorize")
+]
+
+urls = (urlpatterns, "google_oauth", "google_oauth")

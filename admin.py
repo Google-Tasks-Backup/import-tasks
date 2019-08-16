@@ -35,7 +35,7 @@ from google.appengine.ext.webapp import template
 from google.appengine.ext import blobstore
 from google.appengine.ext.webapp import blobstore_handlers
 
-from oauth2client.appengine import OAuth2Decorator
+from oauth2client.contrib.appengine import OAuth2Decorator
 
 
 # Project-specific imports

@@ -62,7 +62,7 @@ class DailyLimitExceededError(Exception):
     
     msg = "Daily limit exceeded. Please try again after midnight Pacific Standard Time."
     
-    def __init__(self, msg = None): # pylint: disable=super-init-not-called
+    def __init__(self, msg=None): # pylint: disable=super-init-not-called
         if msg:
             self.msg = msg
             
@@ -128,7 +128,7 @@ def get_exception_name():
     # exc_name = cla.__name__
     # return str(exc_name) + ": " + str(msg)
   
-def get_exception_msg(e = None):
+def get_exception_msg(e=None):
     """ Return string containing exception type and message
     
         args:
@@ -196,7 +196,7 @@ def escape_html(text):
     # From http://docs.python.org/howto/unicode.html
     #   .encode('ascii', 'xmlcharrefreplace')
     #   'xmlcharrefreplace' uses XML's character references, e.g. &#40960;
-    return cgi.escape(text).encode('ascii', 'xmlcharrefreplace').replace('\n','<br />')
+    return cgi.escape(text).encode('ascii', 'xmlcharrefreplace').replace('\n', '<br />')
     #return cgi.escape(text.decode('unicode_escape')).replace('\n', '<br />')
     #return "".join(html_escape_table.get(c,c) for c in text)
 
@@ -209,7 +209,7 @@ def serve_quota_exceeded_page(self):
     
     
 def serve_message_page(self, # pylint: disable=too-many-arguments,too-many-locals 
-        msg1, msg2 = None, msg3 = None, 
+        msg1, msg2=None, msg3=None, 
         show_back_button=False, 
         back_button_text="Back to previous page",
         show_custom_button=False, custom_button_text='Try again', custom_button_url=settings.MAIN_PAGE_URL,
@@ -275,12 +275,12 @@ def serve_message_page(self, # pylint: disable=too-many-arguments,too-many-local
             template_values.update(extra_template_values)
             
         self.response.out.write(template.render(path, template_values))
-        logging.debug(fn_name + "<End>" )
+        logging.debug(fn_name + "<End>")
         logservice.flush()
     except Exception, e: # pylint: disable=broad-except
         logging.exception(fn_name + "Caught top-level exception")
         serve_outer_exception_message(self, e)
-        logging.debug(fn_name + "<End> due to exception" )
+        logging.debug(fn_name + "<End> due to exception")
         logservice.flush()
     
 
@@ -338,6 +338,8 @@ def reject_non_test_user(self):
 def send_email_to_support(subject, msg, job_start_timestamp=None):
     fn_name = "send_email_to_support: "
     
+    msg = msg.replace('<br>', '\n')    
+    
     try:
         # TODO: Add date & time (or some random, unique ID) to subject so each subject is unique,
         # so that Gmail doesn't put them all in one conversation
@@ -389,22 +391,23 @@ def log_content_as_json(label, content):
     fn_name = "log_content_as_json: "
     
     try:
-        logging.info(u"{} {} = {}".format(
+        # Try to de-serialise content to JSON
+        # Strip trailing newlines
+        parsed_json = json.loads(content.rstrip())
+        logging.info(u"{} {} as JSON = {}".format(
             fn_name,
             label,
-            json.dumps(content, indent=4)))
+            json.dumps(parsed_json, indent=4)))
         return
     except: # pylint: disable=bare-except
         # No need to log anything here, as the content may be serialised JSON
         pass
         
     try:
-        # Try to de-serialise content to JSON
-        parsed_json = json.loads(content)
-        logging.info(u"{} {} as JSON = {}".format(
+        logging.info(u"{} {} = {}".format(
             fn_name,
             label,
-            json.dumps(parsed_json, indent=4)))
+            json.dumps(content, indent=4)))
         return
     except Exception as ex: # pylint: disable=broad-except
         logging.warning("{}Unable to log {} as JSON: {}".format(

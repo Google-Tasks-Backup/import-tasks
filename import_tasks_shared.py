@@ -275,6 +275,12 @@ def _file_contains_valid_columns(file_obj, valid_column_names):
                 " cannot directly import an Outlook export file. Please refer to the <a href='" +
                 settings.OUTLOOK_INSTRUCTIONS_URL + "'>instructions for exporting tasks from outlook</a>."), False
         
+        # JS 2019-07-31; Check for GTB raw, raw1 and raw2 files
+        for column_names in constants.GTB_RAW_COLUMN_NAMES_LISTS:
+            if dict_reader.fieldnames == column_names:
+                return (host_settings.APP_TITLE + 
+                    " cannot import 'Raw CSV' files from Google Tasks Backup<br>" +
+                    "Please use '<b>Import/Export GTBak</b>' or <b>'Import/Export CSV'</b> format when exporting from GTB"), False        
         
         for col_name in valid_column_names:
             if not col_name in dict_reader.fieldnames:
@@ -396,9 +402,16 @@ def file_has_valid_header_row(file_obj, valid_column_names):
         # Check if header row is plain ASCII
         try:
             _ = header_row.encode('ascii')
-        except Exception, e: # pylint: disable=broad-except
-            return "The header row may only contain plain ASCII characters: " + shared.get_exception_msg(e), True
+        except Exception as e: # pylint: disable=broad-except
+            return "The header row may only contain plain ASCII characters: " + shared.get_exception_msg(e), False
                                 
+        # JS 2019-07-31; Test that first row contains commas
+        try:
+            if not header_row.count(','):
+                return "First row must contain comma-separated column headers", False
+        except Exception as e: # pylint: disable=broad-except
+            return "First row must contain comma-separated column headers: " + shared.get_exception_msg(e), False
+            
         # Check if the file can be parsed by unicodecsv, and that it has the minimum required columns
         # NOTE: _file_contains_valid_columns() returns a tuple
         return _file_contains_valid_columns(file_obj, valid_column_names)

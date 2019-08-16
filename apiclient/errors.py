@@ -23,8 +23,8 @@ should be defined in this file.
 __author__ = 'jcgregorio@google.com (Joe Gregorio)'
 
 
-from oauth2client import util
-from oauth2client.anyjson import simplejson
+from common import util
+from common.anyjson import simplejson
 
 
 class Error(Exception):

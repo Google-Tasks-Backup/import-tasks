@@ -40,7 +40,6 @@ import time
 import webapp2
 
 
-
 # App engine libraries
 # --------------------
 from google.appengine.api import urlfetch
@@ -59,14 +58,16 @@ from apiclient import discovery
 # Import from error so that we can process HttpError
 from apiclient import errors as apiclient_errors
 # JS 2012-09-16: Imports to enable credentials = StorageByKeyName()
-from oauth2client.appengine import StorageByKeyName
-from oauth2client.appengine import CredentialsModel
+from oauth2client.contrib.appengine import StorageByKeyName
+from oauth2client.contrib.appengine import CredentialsModel
 # To allow catching initial "error" : "invalid_grant" and logging as Info
 # rather than as a Warning or Error, because AccessTokenRefreshError seems
 # to happen quite regularly
 from oauth2client.client import AccessTokenRefreshError
+
 import unicodecsv # Used instead of csv, supports unicode
 import httplib2
+
 
 # App-specific imports
 # --------------------
@@ -825,6 +826,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                 # -------------------------------------------------------
                 import_tasks_shared.set_RFC3339_timestamp(task_row_data, 'due', constants.DUE_DATE_FORMATS)
                 import_tasks_shared.set_RFC3339_timestamp(task_row_data, 'completed', constants.COMPLETED_DATETIME_FORMATS)
+                import_tasks_shared.set_RFC3339_timestamp(task_row_data, 'updated', constants.COMPLETED_DATETIME_FORMATS)
                 
                 # ------------------------------------------------------
                 #       Replace "\n" string in notes with newline
@@ -1114,14 +1116,17 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                     
                     except KeyError:
                         # This usually indicates that the result did not return a valid task object
-                        logging.exception(fn_name + "KeyError inserting task for data row for " + 
+                        logging.exception(fn_name + "KeyError inserting task for data row " +
+                            str(self.import_job_state.data_row_num) + " for " + 
                             self.user_email +
-                            str(self.import_job_state.data_row_num) + ", task insert result ==>")
+                            ", task insert result ==>")
                         shared.log_content_as_json('task insert result', result)
                         logging.debug(fn_name +     "  Retry count = " + str(retry_count))
                         logservice.flush()
                     
                     except apiclient_errors.HttpError as http_err:
+                        extra_http_err_msg = ''
+                        reason = ''
                         if self.is_test_user:
                             # DEBUG
                             logging.debug(fn_name + "TEST: HttpError DEBUG: HttpError inserting task: " + 
@@ -1130,26 +1135,47 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                             shared.log_content_as_json('task_row_data', task_row_data)
                             logging.debug(fn_name + "TEST: HttpError DEBUG: task insert result ==>")
                             shared.log_content_as_json('task insert result', result)
+                        
+                        try:
+                            reason = http_err._get_reason() # pylint: disable=protected-access
+                        except: # pylint: disable=bare-except
+                            pass
+                            
+                        if reason and "invalid" in reason.lower():
+                            # The Tasks API doesn't indicate which value is invalid, 
+                            # so try to log the 'body', in case that contains an invalid value.
+                            # We first try to log as JSON, because that is the format that
+                            # the Tasks API expects.
+                            # We also log the repr and the raw values, to give us the maximum 
+                            # possible representations to help find the cause of the 
+                            # "Invalid Value" message.
+                            # JS 2019-07-28; Was checking for "invalid value", but today GTI  
+                            # received reason code "invalid" instead of "invalid value",
+                            # so now logging row data if reason contains "invalid"
+                            logging.warning("{}HttpError reason = '{}', so logging task_row_data ==>".format(
+                                fn_name,
+                                reason)) # pylint: disable=protected-access
+                            shared.log_content_as_json('task_row_data', task_row_data)
+                            
+                            # JS 2019-07-31; Receiving "Invalid Value" if 'notes' are too long
+                            if 'notes' in task_row_data:
+                                notes_len = len(task_row_data['notes'])
+                                if notes_len > constants.MAX_NOTES_LEN:
+                                    extra_http_err_msg = "<br>This may be because the length of 'notes' in row {:,} is {:,} which exceeds the new limit of {:,} allowed by Google Tasks".format(
+                                        self.import_job_state.data_row_num,
+                                        notes_len,
+                                        constants.MAX_NOTES_LEN)
+                                    retry_count = 0 # Don't bother retrying for over-sized notes
                             
                         if retry_count == 0:
                             logging.exception(fn_name + 
-                                "Error inserting task at depth {} for {}".format(
+                                "Error inserting task from row {} at depth {} for {}".format(
+                                    self.import_job_state.data_row_num,
                                     depth, self.user_email))
                             logging.debug("{}tasklist_id = {}".format(fn_name, self.import_job_state.tasklist_id))
                             logging.debug("{}parent_id = {}".format(fn_name, parent_id))
                             logging.debug("{}sibling_id = {}".format(fn_name, sibling_id))
-                            
-                            if http_err._get_reason() and http_err._get_reason().lower() == "invalid value": # pylint: disable=protected-access
-                                # The Tasks API doesn't indicate which value is invalid, 
-                                # so try to log the 'body', in case that contains an invalid value.
-                                # We first try to log as JSON, because that is the format that
-                                # the Tasks API expects.
-                                # We also log the repr and the raw values, to give us the maximum 
-                                # possible representations to help find the cause of the 
-                                # "Invalid Value" message.
-                                logging.warning(fn_name + "HttpError reason = 'Invalid Value', so logging task_row_data ==>")
-                                shared.log_content_as_json('task_row_data', task_row_data)
-                            
+                        
                             _log_job_state(self.import_job_state)
                             
                             
@@ -1163,7 +1189,8 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                             #       even though we have an ID for the previously created sibling &/or parent task.
                             #       i.e., We have the ID returned from a previous insert(), but we get a 404 when we try to
                             #             access that task.
-                            logging.error(fn_name + "INSERT FAILED - missing parent or sibling: " + 
+                            logging.error(fn_name + "INSERT FAILED for row " + 
+                                str(self.import_job_state.data_row_num) + "- missing parent or sibling: " + 
                                 shared.get_exception_msg(http_err))
                             logging.error(fn_name + "    Inserting task number " + str(self.import_job_state.num_tasks_in_list) +
                                 " in tasklist number " + str(self.process_tasks_job.num_tasklists) +
@@ -1228,7 +1255,12 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                                         logservice.flush()
                                         return
                                 
+                                
                         # Don't report error if we successfully created a missing task
+                        if created_missing_task:
+                            logging.info(fn_name + "Recreated missing task")
+                            break # Success, so break out of the retry loop
+                            
                         if not created_missing_task:
                             # Report non-404 error, or error where we were unable to recreate missing task
                             if retry_count == 0:
@@ -1237,7 +1269,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                                     ":\n    tasklist_id = [" + str(self.import_job_state.tasklist_id) +
                                     "]\n    parent_id = [" + str(self.import_job_state.parent_id) +
                                     "]\n    previous_id = [" + str(self.import_job_state.sibling_id) +
-                                    "]\n    Task num = " + str(self.import_job_state.data_row_num) +
+                                    "]\n    Row num = " + str(self.import_job_state.data_row_num) +
                                     "\n    Depth = " + str(depth))
                                 logservice.flush()
                                 
@@ -1249,10 +1281,19 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                                     self.import_job_state.tasklist_id, 
                                     self.import_job_state.parent_id, 
                                     self.import_job_state.sibling_id)
-                                    
-                            self._handle_http_error(fn_name, http_err, retry_count, 
-                                "Http error " + str(http_err.resp.status) + " creating task from data row " + 
-                                str(self.import_job_state.data_row_num))
+                        
+                        if reason:
+                            err_msg = 'Http error {} "{}" creating task from data row {}{}'.format(
+                                        http_err.resp.status,
+                                        reason,
+                                        self.import_job_state.data_row_num,
+                                        extra_http_err_msg)
+                        else:
+                            err_msg = 'Http error {} creating task from data row {}{}'.format(
+                                        http_err.resp.status,
+                                        self.import_job_state.data_row_num,
+                                        extra_http_err_msg)
+                        self._handle_http_error(fn_name, http_err, retry_count, err_msg)
                         
                     except Exception as ex: # pylint: disable=broad-except
                         if retry_count == 0:
@@ -1631,7 +1672,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
         logservice.flush()
 
         
-    def _insert_missing_task(self, prev_tasks_data): # pylint: disable=too-many-statements
+    def _insert_missing_task(self, prev_tasks_data): # pylint: disable=too-many-statements,too-many-locals
         """ Insert task into specified tasklist.
         
             args:

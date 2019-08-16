@@ -1,7 +1,6 @@
-#!/usr/bin/python2.4
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2011 Google Inc.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,233 +13,238 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Crypto-related routines for oauth2client."""
 
-import base64
-import hashlib
+import json
 import logging
 import time
 
-from OpenSSL import crypto
-from anyjson import simplejson
+from oauth2client import _helpers
+from oauth2client import _pure_python_crypt
 
 
-logger = logging.getLogger(__name__)
+RsaSigner = _pure_python_crypt.RsaSigner
+RsaVerifier = _pure_python_crypt.RsaVerifier
 
 CLOCK_SKEW_SECS = 300  # 5 minutes in seconds
 AUTH_TOKEN_LIFETIME_SECS = 300  # 5 minutes in seconds
 MAX_TOKEN_LIFETIME_SECS = 86400  # 1 day in seconds
 
+logger = logging.getLogger(__name__)
+
 
 class AppIdentityError(Exception):
-  pass
+    """Error to indicate crypto failure."""
 
 
-class Verifier(object):
-  """Verifies the signature on a message."""
+def _bad_pkcs12_key_as_pem(*args, **kwargs):
+    raise NotImplementedError('pkcs12_key_as_pem requires OpenSSL.')
 
-  def __init__(self, pubkey):
-    """Constructor.
+
+try:
+    from oauth2client import _openssl_crypt
+    OpenSSLSigner = _openssl_crypt.OpenSSLSigner
+    OpenSSLVerifier = _openssl_crypt.OpenSSLVerifier
+    pkcs12_key_as_pem = _openssl_crypt.pkcs12_key_as_pem
+except ImportError:  # pragma: NO COVER
+    OpenSSLVerifier = None
+    OpenSSLSigner = None
+    pkcs12_key_as_pem = _bad_pkcs12_key_as_pem
+
+try:
+    from oauth2client import _pycrypto_crypt
+    PyCryptoSigner = _pycrypto_crypt.PyCryptoSigner
+    PyCryptoVerifier = _pycrypto_crypt.PyCryptoVerifier
+except ImportError:  # pragma: NO COVER
+    PyCryptoVerifier = None
+    PyCryptoSigner = None
+
+
+if OpenSSLSigner:
+    Signer = OpenSSLSigner
+    Verifier = OpenSSLVerifier
+elif PyCryptoSigner:  # pragma: NO COVER
+    Signer = PyCryptoSigner
+    Verifier = PyCryptoVerifier
+else:  # pragma: NO COVER
+    Signer = RsaSigner
+    Verifier = RsaVerifier
+
+
+def make_signed_jwt(signer, payload, key_id=None):
+    """Make a signed JWT.
+
+    See http://self-issued.info/docs/draft-jones-json-web-token.html.
 
     Args:
-      pubkey, OpenSSL.crypto.PKey, The public key to verify with.
-    """
-    self._pubkey = pubkey
-
-  def verify(self, message, signature):
-    """Verifies a message against a signature.
-
-    Args:
-      message: string, The message to verify.
-      signature: string, The signature on the message.
+        signer: crypt.Signer, Cryptographic signer.
+        payload: dict, Dictionary of data to convert to JSON and then sign.
+        key_id: string, (Optional) Key ID header.
 
     Returns:
-      True if message was singed by the private key associated with the public
-      key that this object was constructed with.
+        string, The JWT for the payload.
     """
+    header = {'typ': 'JWT', 'alg': 'RS256'}
+    if key_id is not None:
+        header['kid'] = key_id
+
+    segments = [
+        _helpers._urlsafe_b64encode(_helpers._json_encode(header)),
+        _helpers._urlsafe_b64encode(_helpers._json_encode(payload)),
+    ]
+    signing_input = b'.'.join(segments)
+
+    signature = signer.sign(signing_input)
+    segments.append(_helpers._urlsafe_b64encode(signature))
+
+    logger.debug(str(segments))
+
+    return b'.'.join(segments)
+
+
+def _verify_signature(message, signature, certs):
+    """Verifies signed content using a list of certificates.
+
+    Args:
+        message: string or bytes, The message to verify.
+        signature: string or bytes, The signature on the message.
+        certs: iterable, certificates in PEM format.
+
+    Raises:
+        AppIdentityError: If none of the certificates can verify the message
+                          against the signature.
+    """
+    for pem in certs:
+        verifier = Verifier.from_string(pem, is_x509_cert=True)
+        if verifier.verify(message, signature):
+            return
+
+    # If we have not returned, no certificate confirms the signature.
+    raise AppIdentityError('Invalid token signature')
+
+
+def _check_audience(payload_dict, audience):
+    """Checks audience field from a JWT payload.
+
+    Does nothing if the passed in ``audience`` is null.
+
+    Args:
+        payload_dict: dict, A dictionary containing a JWT payload.
+        audience: string or NoneType, an audience to check for in
+                  the JWT payload.
+
+    Raises:
+        AppIdentityError: If there is no ``'aud'`` field in the payload
+                          dictionary but there is an ``audience`` to check.
+        AppIdentityError: If the ``'aud'`` field in the payload dictionary
+                          does not match the ``audience``.
+    """
+    if audience is None:
+        return
+
+    audience_in_payload = payload_dict.get('aud')
+    if audience_in_payload is None:
+        raise AppIdentityError(
+            'No aud field in token: {0}'.format(payload_dict))
+    if audience_in_payload != audience:
+        raise AppIdentityError('Wrong recipient, {0} != {1}: {2}'.format(
+            audience_in_payload, audience, payload_dict))
+
+
+def _verify_time_range(payload_dict):
+    """Verifies the issued at and expiration from a JWT payload.
+
+    Makes sure the current time (in UTC) falls between the issued at and
+    expiration for the JWT (with some skew allowed for via
+    ``CLOCK_SKEW_SECS``).
+
+    Args:
+        payload_dict: dict, A dictionary containing a JWT payload.
+
+    Raises:
+        AppIdentityError: If there is no ``'iat'`` field in the payload
+                          dictionary.
+        AppIdentityError: If there is no ``'exp'`` field in the payload
+                          dictionary.
+        AppIdentityError: If the JWT expiration is too far in the future (i.e.
+                          if the expiration would imply a token lifetime
+                          longer than what is allowed.)
+        AppIdentityError: If the token appears to have been issued in the
+                          future (up to clock skew).
+        AppIdentityError: If the token appears to have expired in the past
+                          (up to clock skew).
+    """
+    # Get the current time to use throughout.
+    now = int(time.time())
+
+    # Make sure issued at and expiration are in the payload.
+    issued_at = payload_dict.get('iat')
+    if issued_at is None:
+        raise AppIdentityError(
+            'No iat field in token: {0}'.format(payload_dict))
+    expiration = payload_dict.get('exp')
+    if expiration is None:
+        raise AppIdentityError(
+            'No exp field in token: {0}'.format(payload_dict))
+
+    # Make sure the expiration gives an acceptable token lifetime.
+    if expiration >= now + MAX_TOKEN_LIFETIME_SECS:
+        raise AppIdentityError(
+            'exp field too far in future: {0}'.format(payload_dict))
+
+    # Make sure (up to clock skew) that the token wasn't issued in the future.
+    earliest = issued_at - CLOCK_SKEW_SECS
+    if now < earliest:
+        raise AppIdentityError('Token used too early, {0} < {1}: {2}'.format(
+            now, earliest, payload_dict))
+    # Make sure (up to clock skew) that the token isn't already expired.
+    latest = expiration + CLOCK_SKEW_SECS
+    if now > latest:
+        raise AppIdentityError('Token used too late, {0} > {1}: {2}'.format(
+            now, latest, payload_dict))
+
+
+def verify_signed_jwt_with_certs(jwt, certs, audience=None):
+    """Verify a JWT against public certs.
+
+    See http://self-issued.info/docs/draft-jones-json-web-token.html.
+
+    Args:
+        jwt: string, A JWT.
+        certs: dict, Dictionary where values of public keys in PEM format.
+        audience: string, The audience, 'aud', that this JWT should contain. If
+                  None then the JWT's 'aud' parameter is not verified.
+
+    Returns:
+        dict, The deserialized JSON payload in the JWT.
+
+    Raises:
+        AppIdentityError: if any checks are failed.
+    """
+    jwt = _helpers._to_bytes(jwt)
+
+    if jwt.count(b'.') != 2:
+        raise AppIdentityError(
+            'Wrong number of segments in token: {0}'.format(jwt))
+
+    header, payload, signature = jwt.split(b'.')
+    message_to_sign = header + b'.' + payload
+    signature = _helpers._urlsafe_b64decode(signature)
+
+    # Parse token.
+    payload_bytes = _helpers._urlsafe_b64decode(payload)
     try:
-      crypto.verify(self._pubkey, signature, message, 'sha256')
-      return True
+        payload_dict = json.loads(_helpers._from_bytes(payload_bytes))
     except:
-      return False
+        raise AppIdentityError('Can\'t parse token: {0}'.format(payload_bytes))
 
-  @staticmethod
-  def from_string(key_pem, is_x509_cert):
-    """Construct a Verified instance from a string.
+    # Verify that the signature matches the message.
+    _verify_signature(message_to_sign, signature, certs.values())
 
-    Args:
-      key_pem: string, public key in PEM format.
-      is_x509_cert: bool, True if key_pem is an X509 cert, otherwise it is
-        expected to be an RSA key in PEM format.
+    # Verify the issued at and created times in the payload.
+    _verify_time_range(payload_dict)
 
-    Returns:
-      Verifier instance.
+    # Check audience.
+    _check_audience(payload_dict, audience)
 
-    Raises:
-      OpenSSL.crypto.Error if the key_pem can't be parsed.
-    """
-    if is_x509_cert:
-      pubkey = crypto.load_certificate(crypto.FILETYPE_PEM, key_pem)
-    else:
-      pubkey = crypto.load_privatekey(crypto.FILETYPE_PEM, key_pem)
-    return Verifier(pubkey)
-
-
-class Signer(object):
-  """Signs messages with a private key."""
-
-  def __init__(self, pkey):
-    """Constructor.
-
-    Args:
-      pkey, OpenSSL.crypto.PKey, The private key to sign with.
-    """
-    self._key = pkey
-
-  def sign(self, message):
-    """Signs a message.
-
-    Args:
-      message: string, Message to be signed.
-
-    Returns:
-      string, The signature of the message for the given key.
-    """
-    return crypto.sign(self._key, message, 'sha256')
-
-  @staticmethod
-  def from_string(key, password='notasecret'):
-    """Construct a Signer instance from a string.
-
-    Args:
-      key: string, private key in P12 format.
-      password: string, password for the private key file.
-
-    Returns:
-      Signer instance.
-
-    Raises:
-      OpenSSL.crypto.Error if the key can't be parsed.
-    """
-    pkey = crypto.load_pkcs12(key, password).get_privatekey()
-    return Signer(pkey)
-
-
-def _urlsafe_b64encode(raw_bytes):
-  return base64.urlsafe_b64encode(raw_bytes).rstrip('=')
-
-
-def _urlsafe_b64decode(b64string):
-  # Guard against unicode strings, which base64 can't handle.
-  b64string = b64string.encode('ascii')
-  padded = b64string + '=' * (4 - len(b64string) % 4)
-  return base64.urlsafe_b64decode(padded)
-
-
-def _json_encode(data):
-  return simplejson.dumps(data, separators = (',', ':'))
-
-
-def make_signed_jwt(signer, payload):
-  """Make a signed JWT.
-
-  See http://self-issued.info/docs/draft-jones-json-web-token.html.
-
-  Args:
-    signer: crypt.Signer, Cryptographic signer.
-    payload: dict, Dictionary of data to convert to JSON and then sign.
-
-  Returns:
-    string, The JWT for the payload.
-  """
-  header = {'typ': 'JWT', 'alg': 'RS256'}
-
-  segments = [
-          _urlsafe_b64encode(_json_encode(header)),
-          _urlsafe_b64encode(_json_encode(payload)),
-  ]
-  signing_input = '.'.join(segments)
-
-  signature = signer.sign(signing_input)
-  segments.append(_urlsafe_b64encode(signature))
-
-  logger.debug(str(segments))
-
-  return '.'.join(segments)
-
-
-def verify_signed_jwt_with_certs(jwt, certs, audience):
-  """Verify a JWT against public certs.
-
-  See http://self-issued.info/docs/draft-jones-json-web-token.html.
-
-  Args:
-    jwt: string, A JWT.
-    certs: dict, Dictionary where values of public keys in PEM format.
-    audience: string, The audience, 'aud', that this JWT should contain. If
-      None then the JWT's 'aud' parameter is not verified.
-
-  Returns:
-    dict, The deserialized JSON payload in the JWT.
-
-  Raises:
-    AppIdentityError if any checks are failed.
-  """
-  segments = jwt.split('.')
-
-  if (len(segments) != 3):
-    raise AppIdentityError(
-      'Wrong number of segments in token: %s' % jwt)
-  signed = '%s.%s' % (segments[0], segments[1])
-
-  signature = _urlsafe_b64decode(segments[2])
-
-  # Parse token.
-  json_body = _urlsafe_b64decode(segments[1])
-  try:
-    parsed = simplejson.loads(json_body)
-  except:
-    raise AppIdentityError('Can\'t parse token: %s' % json_body)
-
-  # Check signature.
-  verified = False
-  for (keyname, pem) in certs.items():
-    verifier = Verifier.from_string(pem, True)
-    if (verifier.verify(signed, signature)):
-      verified = True
-      break
-  if not verified:
-    raise AppIdentityError('Invalid token signature: %s' % jwt)
-
-  # Check creation timestamp.
-  iat = parsed.get('iat')
-  if iat is None:
-    raise AppIdentityError('No iat field in token: %s' % json_body)
-  earliest = iat - CLOCK_SKEW_SECS
-
-  # Check expiration timestamp.
-  now = long(time.time())
-  exp = parsed.get('exp')
-  if exp is None:
-    raise AppIdentityError('No exp field in token: %s' % json_body)
-  if exp >= now + MAX_TOKEN_LIFETIME_SECS:
-    raise AppIdentityError(
-      'exp field too far in future: %s' % json_body)
-  latest = exp + CLOCK_SKEW_SECS
-
-  if now < earliest:
-    raise AppIdentityError('Token used too early, %d < %d: %s' %
-      (now, earliest, json_body))
-  if now > latest:
-    raise AppIdentityError('Token used too late, %d > %d: %s' %
-      (now, latest, json_body))
-
-  # Check audience.
-  if audience is not None:
-    aud = parsed.get('aud')
-    if aud is None:
-      raise AppIdentityError('No aud field in token: %s' % json_body)
-    if aud != audience:
-      raise AppIdentityError('Wrong recipient, %s != %s: %s' %
-          (aud, audience, json_body))
-
-  return parsed
+    return payload_dict

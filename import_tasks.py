@@ -41,7 +41,7 @@ from google.appengine.ext import blobstore
 from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp import blobstore_handlers
 
-from oauth2client.appengine import OAuth2Decorator
+from oauth2client.contrib.appengine import OAuth2Decorator
 
 import unicodecsv # Used instead of csv, supports unicode
 
@@ -227,8 +227,11 @@ class WelcomeHandler(webapp2.RequestHandler):
 
         try:
             display_link_to_production_server = False # pylint: disable=invalid-name
-            if not self.request.host in settings.PRODUCTION_SERVERS and settings.DISPLAY_LINK_TO_PRODUCTION_SERVER:
-                display_link_to_production_server = True # pylint: disable=invalid-name
+            if not self.request.host in settings.PRODUCTION_SERVERS:
+                logging.info("%sRunning on non-production server %s",
+                            fn_name, self.request.host)
+                if settings.DISPLAY_LINK_TO_PRODUCTION_SERVER:
+                    display_link_to_production_server = True # pylint: disable=invalid-name
             
             user = users.get_current_user()
             user_email = None
@@ -237,10 +240,12 @@ class WelcomeHandler(webapp2.RequestHandler):
                 user_email = user.email()
                 
                 if not self.request.host in settings.PRODUCTION_SERVERS:
-                    # logging.debug(fn_name + "DEBUG: Running on limited-access server")
                     if shared.is_test_user(user_email):
                         # Allow test user to see normal page content
                         display_link_to_production_server = False # pylint: disable=invalid-name
+                    else:
+                        logging.info("%sRejecting non-test user [%s] on limited access server %s",
+                            fn_name, user_email, self.request.host)
                 
                 logging.debug(fn_name + "User is logged in, so displaying username and logout link")
                 is_admin_user = users.is_current_user_admin()
@@ -331,7 +336,8 @@ class MainHandler(webapp2.RequestHandler):
                     # Allow test user to see normal page
                     display_link_to_production_server = False # pylint: disable=invalid-name
                 else:
-                    logging.info(fn_name + "Rejecting non-test user [" + str(user_email) + "] on limited access server")
+                    logging.info("%sRejecting non-test user [%s] on limited access server %s",
+                        fn_name, user_email, self.request.host)
                     logservice.flush()
                     shared.reject_non_test_user(self)
                     logging.debug(fn_name + "<End> (Non test user on limited access server)")
@@ -524,7 +530,8 @@ class ContinueImportJob(webapp2.RequestHandler):
         
         if not self.request.host in settings.PRODUCTION_SERVERS:
             if not shared.is_test_user(user_email):
-                logging.info(fn_name + "Rejecting non-test user [" + str(user_email) + "] on limited access server")
+                logging.info("%sRejecting non-test user [%s] on limited access server %s",
+                    fn_name, user_email, self.request.host)
                 logservice.flush()
                 shared.reject_non_test_user(self)
                 logging.debug(fn_name + "<End> (Non test user on limited access server)")
@@ -623,7 +630,8 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                     # Allow test user to see normal page
                     display_link_to_production_server = False # pylint: disable=invalid-name
                 else:
-                    logging.info(fn_name + "Rejecting non-test user [" + unicode(user_email) + "] on limited access server")
+                    logging.info("%sRejecting non-test user [%s] on limited access server %s",
+                        fn_name, user_email, self.request.host)
                     logservice.flush()
                     shared.reject_non_test_user(self)
                     logging.debug(fn_name + "<End> (Non test user on limited access server)")
@@ -831,7 +839,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                             
                 except Exception, e: # pylint: disable=broad-except
                     logging.exception(fn_name + "Error reading file (determining file type)")
-                    # Don't log/dispay file name or content, as non-ASCII string may cause another exception
+                    # Don't log/display file name or content, as non-ASCII string may cause another exception
                     err_msg1 = "Unable to import tasks - Unknown data format in file"
                     err_msg2 = "Error: " + shared.get_exception_msg(e)
                     logging.info(fn_name + constants.INVALID_FORMAT_LOG_LABEL + err_msg1 + ": " + err_msg2)
@@ -1371,7 +1379,8 @@ class ShowProgressHandler(webapp2.RequestHandler):
                     # Allow test user to see normal page
                     display_link_to_production_server = False # pylint: disable=invalid-name
                 else:
-                    logging.info(fn_name + "Rejecting non-test user [" + str(user_email) + "] on limited access server")
+                    logging.info("%sRejecting non-test user [%s] on limited access server %s",
+                        fn_name, user_email, self.request.host)
                     logservice.flush()
                     shared.reject_non_test_user(self)
                     logging.debug(fn_name + "<End> (Non test user on limited access server)")
@@ -1508,6 +1517,16 @@ class ShowProgressHandler(webapp2.RequestHandler):
                 logservice.flush()
                 
                 
+            # We don't want to use the 'safe' filter in Django to allow HTML content in
+            # error messages, in case that leads to an exploit. 
+            # But we will split content on <br>
+            # Can't split on newline, as newline in error_message raises
+            #       BadValueError: Property error_message is not multi-line
+            error_message_lines = []
+            if '<br>' in error_message:
+                # This is a multi-line error message
+                error_message_lines = error_message.split('<br>')
+                
             path = os.path.join(os.path.dirname(__file__), constants.PATH_TO_TEMPLATES, "progress.html")
             
             template_values = {'app_title' : host_settings.APP_TITLE,
@@ -1533,6 +1552,7 @@ class ShowProgressHandler(webapp2.RequestHandler):
                                'display_tasklist_suffix_msg' : display_tasklist_suffix_msg,
                                'job_msg' : job_msg,
                                'error_message' : error_message,
+                               'error_message_lines' : error_message_lines, # Only set if error_message is multi-line 
                                'error_message_extra' : error_message_extra,
                                'is_invalid_format' : is_invalid_format,
                                'job_start_timestamp' : job_start_timestamp, # UTC

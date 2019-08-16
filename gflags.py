@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+# JS, 2019-07-13; Added gflags.py to ignore in .pylintrc, as this file generates a huge number 
+# of warnings, but this is code that I inherited and don't want to change.
+
 # Copyright (c) 2007, Google Inc.
 # All rights reserved.
 #
