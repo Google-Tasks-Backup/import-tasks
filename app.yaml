@@ -7,11 +7,9 @@
 #   Where 0 is the Major and 4 is the Minor
 # When going live, use the full version number (e.g., 'gti-0-4-304')
 #   Where 0 is the Major, 4 is the Minor and 304 is the Revision
-#version: gti-0-6-003
-#version: test-gti-0-6
-# version: gti-0-7
-# version: test
-version: gti-0-10-008
+version: test
+# version: gti-0-10-008
+#version: gti-0-11-005
 
 # ===== Production server ======
 application: import-tasks
@@ -80,6 +78,11 @@ libraries:
 
     
 handlers:
+- url: /privacy
+  static_files: static/privacy.html
+  upload: privacy.html
+  secure: optional
+  
 - url: /static
   static_dir: static
   secure: always

@@ -187,14 +187,13 @@ Uses status constants: STARTING, INITIALISING, IMPORTING, IMPORT_COMPLETED, ERRO
             {% endif %}
             
             {% if error_message %}
-                <br />
-                <div class="take-note break">
+                <div class="take-note break error-msg">
                     {% if error_message_lines %}
                         {% for error_message_line in error_message_lines %}
-                            {{ error_message_line }}<br>
+                            <p>{{ error_message_line }}</p>
                         {% endfor %}
                     {% else %}
-                        {{ error_message }}
+                        <p>{{ error_message }}</p>
                     {% endif %}
                     {% if error_message_extra %}
                         <br />
@@ -209,9 +208,10 @@ Uses status constants: STARTING, INITIALISING, IMPORTING, IMPORT_COMPLETED, ERRO
                         <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a>
                     {% else %}
                         Please help improve GTI by reporting this error at 
-                        <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a><br>
-                        or by sending an email to <a href="mailto:{{ email_discussion_group }}">{{ email_discussion_group }}</a>
+                        <a href="http:/{{ url_issues_page }}">{{ url_issues_page }}</a>
                     {% endif %}
+                    <br>
+                    or by sending an email to <a href="mailto:{{ SUPPORT_EMAIL_ADDRESS }}">{{ SUPPORT_EMAIL_ADDRESS }}</a>
                 </div>
                 <br />
             {% endif %}

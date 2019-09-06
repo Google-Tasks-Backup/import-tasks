@@ -31,8 +31,6 @@ import time # For sleep
 import datetime
 
 
-import webapp2
-
 from google.appengine.api import urlfetch
 from google.appengine.api import taskqueue
 from google.appengine.api import users
@@ -40,6 +38,8 @@ from google.appengine.api import logservice # To flush logs
 from google.appengine.ext import blobstore
 from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp import blobstore_handlers
+
+import webapp2
 
 from oauth2client.contrib.appengine import OAuth2Decorator
 
@@ -66,6 +66,7 @@ logservice.AUTOFLUSH_ENABLED = True
 #     Based on code from https://groups.google.com/forum/#!msg/google-appengine/OANTefJvn0A/uRKKHnCKr7QJ
 real_fetch = urlfetch.fetch # pylint: disable=invalid-name
 def fetch_with_deadline(url, *args, **argv):
+    """ Fetch URL with deadline set by URL_FETCH_TIMEOUT """
     argv['deadline'] = settings.URL_FETCH_TIMEOUT
     logservice.flush()
     return real_fetch(url, *args, **argv)
@@ -118,7 +119,8 @@ def _send_job_to_worker(self, process_tasks_job): # pylint: disable=too-many-sta
         # Add the request to the tasks queue, passing in the user's email so that the task can access the database record
         tq_queue = taskqueue.Queue(settings.PROCESS_TASKS_REQUEST_QUEUE_NAME)
         tq_task = taskqueue.Task(url=settings.WORKER_URL, 
-            params={settings.TASKS_QUEUE_KEY_NAME : user_email}, method='POST')
+                                 params={settings.TASKS_QUEUE_KEY_NAME : user_email}, 
+                                 method='POST')
         logging.debug(fn_name + "Adding task to %s queue, for %s" % 
             (settings.PROCESS_TASKS_REQUEST_QUEUE_NAME, user_email))
         logservice.flush()
@@ -201,7 +203,7 @@ def _send_job_to_worker(self, process_tasks_job): # pylint: disable=too-many-sta
     except Exception, e: # pylint: disable=broad-except
         logging.exception(fn_name + "Caught top-level exception")
         shared.serve_outer_exception_message(self, e)
-        logging.debug(fn_name + "<End> due to exception" )
+        logging.debug(fn_name + "<End> due to exception")
         logservice.flush()
 
     logging.debug(fn_name + "<End>")
@@ -279,6 +281,7 @@ class WelcomeHandler(webapp2.RequestHandler):
                                'logout_url': users.create_logout_url(settings.WELCOME_PAGE_URL),
                                'url_discussion_group' : settings.url_discussion_group,
                                'email_discussion_group' : settings.email_discussion_group,
+                               'SUPPORT_EMAIL_ADDRESS' : settings.SUPPORT_EMAIL_ADDRESS,
                                'url_issues_page' : settings.url_issues_page,
                                'url_source_code' : settings.url_source_code,
                                'app_version' : appversion.version,
@@ -286,7 +289,7 @@ class WelcomeHandler(webapp2.RequestHandler):
                                
             path = os.path.join(os.path.dirname(__file__), constants.PATH_TO_TEMPLATES, "welcome.html")
             self.response.out.write(template.render(path, template_values))
-            logging.debug(fn_name + "<End>" )
+            logging.debug(fn_name + "<End>")
             logservice.flush()
 
         except shared.DailyLimitExceededError, e:
@@ -298,7 +301,7 @@ class WelcomeHandler(webapp2.RequestHandler):
         except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught top-level exception")
             shared.serve_outer_exception_message(self, e)
-            logging.debug(fn_name + "<End> due to exception" )
+            logging.debug(fn_name + "<End> due to exception")
             logservice.flush()
     
     
@@ -442,6 +445,7 @@ class MainHandler(webapp2.RequestHandler):
                                'logout_url': users.create_logout_url(settings.WELCOME_PAGE_URL),
                                'url_discussion_group' : settings.url_discussion_group,
                                'email_discussion_group' : settings.email_discussion_group,
+                               'SUPPORT_EMAIL_ADDRESS' : settings.SUPPORT_EMAIL_ADDRESS,
                                'url_issues_page' : settings.url_issues_page,
                                'url_source_code' : settings.url_source_code,
                                'app_version' : appversion.version,
@@ -451,7 +455,7 @@ class MainHandler(webapp2.RequestHandler):
             self.response.out.write(template.render(path, template_values))
             # logging.debug(fn_name + "Calling garbage collection")
             # gc.collect()
-            logging.debug(fn_name + "<End>" )
+            logging.debug(fn_name + "<End>")
             logservice.flush()
             
         except shared.DailyLimitExceededError, e:
@@ -469,12 +473,12 @@ class MainHandler(webapp2.RequestHandler):
     
 
 class ContinueImportJob(webapp2.RequestHandler):
-    """Continue importing a previously paused import job"""
+    """ Continue importing a previously paused import job """
  
  
     @auth_decorator.oauth_required
     def get(self):
-        
+        """ Continue importing a previously paused import job """
         fn_name = "ContinueImportJob.get(): "
             
         logging.debug(fn_name + "<Start>")
@@ -486,7 +490,7 @@ class ContinueImportJob(webapp2.RequestHandler):
         except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught top-level exception")
             shared.serve_outer_exception_message(self, e)
-            logging.debug(fn_name + "<End> due to exception" )
+            logging.debug(fn_name + "<End> due to exception")
             logservice.flush()
 
     
@@ -496,6 +500,7 @@ class ContinueImportJob(webapp2.RequestHandler):
 
     @auth_decorator.oauth_required
     def post(self):
+        """ Continue importing a previously paused import job """
         
         fn_name = "ContinueImportJob.post(): "
             
@@ -507,7 +512,7 @@ class ContinueImportJob(webapp2.RequestHandler):
         except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught top-level exception")
             shared.serve_outer_exception_message(self, e)
-            logging.debug(fn_name + "<End> due to exception" )
+            logging.debug(fn_name + "<End> due to exception")
             logservice.flush()
 
     
@@ -597,7 +602,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
         except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught top-level exception")
             shared.serve_outer_exception_message(self, e)
-            logging.debug(fn_name + "<End> due to exception" )
+            logging.debug(fn_name + "<End> due to exception")
             logservice.flush()
 
         logging.debug(fn_name + "<End>")
@@ -1028,7 +1033,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
                 
     
             else:
-                logging.debug(fn_name + "<End> due to no file uploaded" )
+                logging.debug(fn_name + "<End> due to no file uploaded")
                 logservice.flush()
                 shared.serve_message_page(self, 'No file uploaded, please try again.', show_custom_button=True)
                 
@@ -1036,7 +1041,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
         except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught top-level exception")
             shared.serve_outer_exception_message(self, e)
-            logging.debug(fn_name + "<End> due to exception" )
+            logging.debug(fn_name + "<End> due to exception")
             logservice.flush()
 
         logging.debug(fn_name + "<End>")
@@ -1085,7 +1090,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
         
         
     def _csv_file_contains_valid_data( # pylint: disable=too-many-locals,too-many-return-statements,too-many-branches,too-many-statements
-                                      self, file_obj, import_tasklist_suffix, file_name = None):
+                                      self, file_obj, import_tasklist_suffix, file_name=None):
         """Returns true if the file contains data in a format that can be parsed by the worker.
             
                 file_obj                A file object referring to a CSV file
@@ -1103,7 +1108,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
             prev_depth = 0
             prev_tasklist_name = ""
             self.num_data_rows = 0
-            dict_reader=unicodecsv.DictReader(file_obj,dialect='excel')
+            dict_reader = unicodecsv.DictReader(file_obj, dialect='excel')
             
             column_names = dict_reader.fieldnames
             
@@ -1574,6 +1579,7 @@ class ShowProgressHandler(webapp2.RequestHandler):
                                'STALLED' : constants.ImportJobStatus.STALLED,
                                'url_discussion_group' : settings.url_discussion_group,
                                'email_discussion_group' : settings.email_discussion_group,
+                               'SUPPORT_EMAIL_ADDRESS' : settings.SUPPORT_EMAIL_ADDRESS,
                                'url_issues_page' : settings.url_issues_page,
                                'url_source_code' : settings.url_source_code,
                                'app_version' : appversion.version,
@@ -1597,7 +1603,7 @@ class ShowProgressHandler(webapp2.RequestHandler):
         except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught top-level exception")
             shared.serve_outer_exception_message(self, e)
-            logging.debug(fn_name + "<End> due to exception" )
+            logging.debug(fn_name + "<End> due to exception")
             logservice.flush()
 
        
@@ -1634,7 +1640,8 @@ class GetNewBlobstoreUrlHandler(webapp2.RequestHandler):
 
         
 class RobotsHandler(webapp2.RequestHandler):
-
+    """ Handle requests for robots.txt """
+    
     def get(self):
         """If not running on production server, return robots.txt with disallow all
            to prevent search engines indexing test servers.
@@ -1671,8 +1678,8 @@ def _job_has_stalled(process_tasks_job):
             
     return False
 
-    
-app = webapp2.WSGIApplication( # pylint: disable=invalid-name
+
+app = webapp2.WSGIApplication( # pylint: disable=invalid-name,bad-whitespace
     [
         ("/robots.txt",                             RobotsHandler),
         (settings.WELCOME_PAGE_URL,                 WelcomeHandler),

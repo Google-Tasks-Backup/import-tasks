@@ -694,7 +694,10 @@ h3.numbered:before {
     margin-right: 0;
 }
 
-
+.error-msg p:first-child {
+    /* Make the first line of an error message stand out */
+    font-size: 130%;
+}
 
 /*
  * *********************
@@ -737,3 +740,4 @@ ul.fake > li:before {
 ul.fake > li.status-completed:before {
   content: "\2713 \a0";
 }
+

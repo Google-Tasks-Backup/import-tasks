@@ -25,6 +25,7 @@ $RECYCLE.BIN/
 ## Other files/folders to ignore
 ################################
 
+testing
 *.bak
 [Aa]rchive
 Logs

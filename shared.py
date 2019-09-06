@@ -1,4 +1,5 @@
-#
+""" Methods shared across modules """
+
 # Copyright 2012  Julie Smith.  All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -52,9 +53,12 @@ logservice.AUTOFLUSH_ENABLED = True
 #     Based on code from https://groups.google.com/forum/#!msg/google-appengine/OANTefJvn0A/uRKKHnCKr7QJ
 real_fetch = urlfetch.fetch # pylint: disable=invalid-name
 def fetch_with_deadline(url, *args, **argv):
+    """ Fetch URL with deadline set by URL_FETCH_TIMEOUT """
+    
     argv['deadline'] = settings.URL_FETCH_TIMEOUT
     return real_fetch(url, *args, **argv)
 urlfetch.fetch = fetch_with_deadline
+
 
 
 class DailyLimitExceededError(Exception):
@@ -66,9 +70,25 @@ class DailyLimitExceededError(Exception):
         if msg:
             self.msg = msg
             
+            
     def __repr__(self):
         return repr(self.msg)
     
+
+
+class TaskInsertError(Exception):
+    """ Indicates that a task could not be inserted. 
+        msg is a message to the user
+    """
+    
+    def __init__(self, msg): # pylint: disable=super-init-not-called
+        self.msg = msg
+        
+            
+    def __repr__(self):
+        return repr(self.msg)
+    
+
 
 def set_cookie( # pylint: disable=too-many-arguments
                res, key, value='', max_age=None,
@@ -102,11 +122,15 @@ def set_cookie( # pylint: disable=too-many-arguments
     
     
 def delete_cookie(res, key):
+    """ Delete cookie """
+    
     logging.debug("Deleting cookie: " + str(key))
     set_cookie(res, key, '', -1)
     
   
 def format_exception_info(max_tb_level=5):
+    """ Return exception name, args and traceback """
+    
     cla, exc, trbk = sys.exc_info()
     exc_name = cla.__name__
     try:
@@ -118,6 +142,8 @@ def format_exception_info(max_tb_level=5):
          
 
 def get_exception_name():
+    """ Return the exception name as a string """
+    
     cla, _, _ = sys.exc_info()
     exc_name = cla.__name__
     return str(exc_name)
@@ -184,6 +210,7 @@ def is_test_user(user_email):
   
 
 def dump_obj(obj):
+    """ Log attribute names and values """
     for attr in dir(obj):
         logging.debug("    obj.%s = %s" % (attr, getattr(obj, attr)))
     logservice.flush()
@@ -202,6 +229,8 @@ def escape_html(text):
 
     
 def serve_quota_exceeded_page(self):
+    """ Display a message indicating that the daily limit has been exceeded """
+    
     msg1 = "Daily limit exceeded"
     msg2 = "The daily quota is reset at midnight Pacific Standard Time (5:00pm Australian Eastern Standard Time, 07:00 UTC)."
     msg3 = "Please rerun " + host_settings.APP_TITLE + " any time after midnight PST to continue importing your file."
@@ -261,6 +290,7 @@ def serve_message_page(self, # pylint: disable=too-many-arguments,too-many-local
                            'product_name' : host_settings.PRODUCT_NAME,
                            'url_discussion_group' : settings.url_discussion_group,
                            'email_discussion_group' : settings.email_discussion_group,
+                           'SUPPORT_EMAIL_ADDRESS' : settings.SUPPORT_EMAIL_ADDRESS,
                            'url_main_page' : settings.MAIN_PAGE_URL,
                            'url_issues_page' : settings.url_issues_page,
                            'url_source_code' : settings.url_source_code,
@@ -318,6 +348,8 @@ def serve_outer_exception_message(self, ex):
         
     
 def reject_non_test_user(self):
+    """ Display a message page indicating that this is a test server """
+    
     fn_name = "reject_non_test_user: "
     
     logging.debug(fn_name + "Rejecting non-test user on limited access server")
@@ -336,6 +368,8 @@ def reject_non_test_user(self):
                     
                     
 def send_email_to_support(subject, msg, job_start_timestamp=None):
+    """ Send an email to SUPPORT_EMAIL_ADDRESS """
+    
     fn_name = "send_email_to_support: "
     
     msg = msg.replace('<br>', '\n')    
@@ -394,7 +428,7 @@ def log_content_as_json(label, content):
         # Try to de-serialise content to JSON
         # Strip trailing newlines
         parsed_json = json.loads(content.rstrip())
-        logging.info(u"{} {} as JSON = {}".format(
+        logging.info(u"{}{} as JSON = {}".format(
             fn_name,
             label,
             json.dumps(parsed_json, indent=4)))
@@ -404,39 +438,39 @@ def log_content_as_json(label, content):
         pass
         
     try:
-        logging.info(u"{} {} = {}".format(
+        logging.info(u"{}{} = {}".format(
             fn_name,
             label,
             json.dumps(content, indent=4)))
         return
     except Exception as ex: # pylint: disable=broad-except
-        logging.warning("{}Unable to log {} as JSON: {}".format(
+        logging.warning("{}Unable to log '{}' as JSON: {}".format(
             fn_name, 
             label,
             get_exception_msg(ex)))
             
     # Try logging repr() of content
     try:
-        logging.info(u"{} {} (repr) = {}".format(
+        logging.info(u"{}{} (repr) = {}".format(
             fn_name,
             label,
             repr(content)))
         return
     except Exception as ex: # pylint: disable=broad-except
-        logging.warning(u"{}Unable to log repr of {}: {}".format(
+        logging.warning(u"{}Unable to log repr of '{}': {}".format(
             fn_name, 
             label,
             get_exception_msg(ex)))
 
     # Try logging content, letting format() handle possible conversion
     try:
-        logging.info(u"{} {} (raw) = {}".format(
+        logging.info(u"{}{} (raw) = {}".format(
             fn_name,
             label,
             content))
         return
     except Exception as ex: # pylint: disable=broad-except
-        logging.warning(u"{}Unable to log {} as raw: {}".format(
+        logging.warning(u"{}Unable to log '{}' as raw: {}".format(
             fn_name, 
             label,
             get_exception_msg(ex)))
@@ -486,3 +520,36 @@ def is_truthy(val):
             val,
             get_exception_msg(ex)))
         return False
+
+
+def get_http_error_reason(http_err):
+    """ Returns the reason text (if possible) for an HTTP error 
+    
+    Returns an empty string if there is no reason
+    """
+    
+    reason = ''
+    try:
+        reason = http_err._get_reason() # pylint: disable=protected-access
+    except: # pylint: disable=bare-except
+        reason = ''
+        
+    return reason
+
+
+def get_http_error_status(http_err):
+    """ Returns the HTTP status (if possible) for an HTTP error.
+    
+    This is safer than calling http_err.resp.status, as there have been rare cases where 
+    http_err.resp has been None, in whicjh case accessing http_err.resp.status raises an error.
+    
+    Returns -1 if there is no resp
+    """
+    
+    status = -1
+    try:
+        status = http_err.resp.status
+    except: # pylint: disable=bare-except
+        status = -1
+        
+    return status

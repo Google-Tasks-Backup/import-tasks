@@ -1,4 +1,5 @@
-#
+""" Common methods specific to GTI """
+
 # Copyright 2012  Julie Smith.  All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -42,6 +43,7 @@ logservice.AUTOFLUSH_ENABLED = True
 #     Based on code from https://groups.google.com/forum/#!msg/google-appengine/OANTefJvn0A/uRKKHnCKr7QJ
 real_fetch = urlfetch.fetch # pylint: disable=invalid-name
 def fetch_with_deadline(url, *args, **argv):
+    """ Fetch URL with deadline set by URL_FETCH_TIMEOUT """
     argv['deadline'] = settings.URL_FETCH_TIMEOUT
     logging.debug("DEBUG: import_tasks_shared.fetch_with_deadline(): deadline = " + str(settings.URL_FETCH_TIMEOUT))
     logservice.flush()
@@ -258,7 +260,7 @@ def _file_contains_valid_columns(file_obj, valid_column_names):
     
     try:
         file_obj.seek(0)
-        dict_reader=unicodecsv.DictReader(file_obj,dialect='excel')
+        dict_reader = unicodecsv.DictReader(file_obj, dialect='excel')
         
         # Check if uploaded file appears to be an Outlook file
         num_outlook_column_names = 0
@@ -586,6 +588,8 @@ def task_exists(tasks_svc, tasklist_id, task_id):
 
         
 def check_task_params_exist(tasklists_svc, tasks_svc, tasklist_id, parent_id, sibling_id):
+    """ Check and log that all specified task parameters exist """
+    
     fn_name = "check_task_params_exist: "
     
     logging.debug(fn_name + "DEBUG: Checking tasklist [" + str(tasklist_id) + 

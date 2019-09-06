@@ -143,6 +143,11 @@ API_RETRY_SLEEP_DURATION = 45
 # This is lower than API_RETRY_SLEEP_DURATION, because frontent must completed within 60 seconds.
 FRONTEND_API_RETRY_SLEEP_DURATION = 18
 
+# Number of seconds to sleep for a "quota exceeded" error
+# Google has a "limit per user per 100 seconds", so we wait at least 100 seconds
+QUOTA_EXCEEDED_API_RETRY_SLEEP_DURATION = 120
+
+
 
 # If the import hasn't finished within MAX_WORKER_RUN_TIME seconds, we stop the current import run, and then
 # add the job to the taskqueue to continue the import process in a new worker.
