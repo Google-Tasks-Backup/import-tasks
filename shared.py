@@ -64,16 +64,15 @@ urlfetch.fetch = fetch_with_deadline
 class DailyLimitExceededError(Exception):
     """ Thrown by get_credentials() when HttpError indicates that daily limit has been exceeded """
     
-    msg = "Daily limit exceeded. Please try again after midnight Pacific Standard Time."
+    # msg = "Daily limit exceeded. Please try again after midnight Pacific Standard Time."
     
     def __init__(self, msg=None): # pylint: disable=super-init-not-called
         if msg:
             self.msg = msg
+        else:
+            self.msg = "Daily limit exceeded. Please try again after midnight Pacific Standard Time."
+        super(DailyLimitExceededError, self).__init__(self.msg)
             
-            
-    def __repr__(self):
-        return repr(self.msg)
-    
 
 
 class TaskInsertError(Exception):
@@ -83,11 +82,25 @@ class TaskInsertError(Exception):
     
     def __init__(self, msg): # pylint: disable=super-init-not-called
         self.msg = msg
-        
-            
-    def __repr__(self):
-        return repr(self.msg)
+        super(TaskInsertError, self).__init__(msg)
+
+
+
+class WorkerNearMaxRunTime(Exception):
+    """ Indicates that this worker needs to end, and job needs to be passed to a new worker.
     
+        This is because there is a maximum 10 minute limit for a background process.
+        
+        :param run_seconds:
+            The number of seconds that the worker has been running. Used in log messages.
+    """
+    
+    def __init__(self, run_seconds):
+        self.run_seconds = run_seconds
+        msg = "Worker has been running for {} seconds".format(run_seconds)
+        super(WorkerNearMaxRunTime, self).__init__(msg)
+
+
 
 
 def set_cookie( # pylint: disable=too-many-arguments
@@ -368,16 +381,17 @@ def reject_non_test_user(self):
                     
                     
 def send_email_to_support(subject, msg, job_start_timestamp=None):
-    """ Send an email to SUPPORT_EMAIL_ADDRESS """
+    """ Send an email to SUPPORT_EMAIL_ADDRESS.
+
+    """
     
     fn_name = "send_email_to_support: "
     
     msg = msg.replace('<br>', '\n')    
     
     try:
-        # TODO: Add date & time (or some random, unique ID) to subject so each subject is unique,
-        # so that Gmail doesn't put them all in one conversation
-        
+        # Ideally, 'subject' should be common to a job, so we try to get the job start time.
+        # This ensures that Gmail doesn't put all GTI error reports in one conversation        
         if job_start_timestamp:
             subject = u"{} v{} ({}) - ERROR for job started at {} - {}".format(
                 host_settings.APP_TITLE,

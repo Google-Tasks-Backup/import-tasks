@@ -645,7 +645,7 @@ class BlobstoreUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
         
             # =================================================
             #   Don't start a new job if job already running
-            #       unles user chose 'force_new_upload'
+            #       unless user chose 'force_new_upload'
             # =================================================
             # Check if worker is already processing an import job
             #   If job is paused, 

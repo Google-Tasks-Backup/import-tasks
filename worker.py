@@ -77,7 +77,7 @@ import settings
 import host_settings
 import appversion # appversion.version is set before the upload process to keep the version number consistent
 import shared # Code whis is common between classes, modules or projects
-from shared import DailyLimitExceededError, TaskInsertError
+from shared import DailyLimitExceededError, TaskInsertError, WorkerNearMaxRunTime
 from shared import get_http_error_reason, get_http_error_status
 import import_tasks_shared  # Code which is common between classes or modules
 import check_task_values
@@ -1310,13 +1310,12 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                 # ==============================================================================
                 # If the job cannot be finished within the maximum allowable time, we need to stop this
                 # worker and start another worker to continue the process.
-                run_time = datetime.datetime.now() - self.run_start_time
-                run_seconds = run_time.seconds
+                
+                run_seconds = (datetime.datetime.now() - self.run_start_time).total_seconds()
                 if run_seconds > settings.MAX_WORKER_RUN_TIME:
                     logging.info("{}NOTE: Worker has been running for {} seconds, so starting a new worker".format(
                         fn_name, run_seconds))
-                    self._start_another_worker(run_time, run_seconds)
-                    return
+                    raise WorkerNearMaxRunTime(run_seconds)
 
             logging.debug(fn_name + "Finished importing tasks")
             logservice.flush()
@@ -1401,6 +1400,11 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
         except TaskInsertError as tie:
             logging.error("%sError inserting task. Message to user:\n%s", fn_name, tie.msg)
             self._report_error(tie.msg)
+            
+        except WorkerNearMaxRunTime as mrt:
+            logging.info("%sNOTE: Worker has been running for %s seconds, so starting a new worker",
+                fn_name, mrt.run_seconds)
+            self._start_another_worker(mrt.run_seconds)
 
         except Exception, e: # pylint: disable=broad-except
             logging.exception(fn_name + "Caught outer Exception:")
@@ -1411,7 +1415,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
         logservice.flush()
 
 
-    def _start_another_worker(self, run_time, run_seconds):
+    def _start_another_worker(self, run_seconds):
 
         fn_name = "_start_another_worker: "
 
@@ -1422,9 +1426,8 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
             self.process_tasks_job.pickled_import_state = pickle.dumps(self.import_job_state)
             self.process_tasks_job.total_progress = self.import_job_state.num_of_imported_tasks
             self.process_tasks_job.data_row_num = self.import_job_state.data_row_num
-            processing_seconds = run_time.seconds + run_time.microseconds / 1000000.0
             self.process_tasks_job.total_processing_seconds = \
-                self.process_tasks_job.total_processing_seconds + processing_seconds
+                self.process_tasks_job.total_processing_seconds + run_seconds
             self.process_tasks_job.job_progress_timestamp = datetime.datetime.now()
 
             total_processing_time_str = "%.1f seconds" % self.process_tasks_job.total_processing_seconds
@@ -1489,10 +1492,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
 
         try:
             end_time = datetime.datetime.now()
-            processing_time = end_time - self.run_start_time
-
-            processing_seconds = processing_time.seconds + processing_time.microseconds / 1000000.0
-
+            processing_seconds = (end_time - self.run_start_time).total_seconds()
 
             # ---------------------------------------
             #       Mark import job complete
@@ -1502,7 +1502,9 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
             self.process_tasks_job.total_progress = self.import_job_state.num_of_imported_tasks
             self.process_tasks_job.data_row_num = self.import_job_state.data_row_num
             self.process_tasks_job.num_tasklists = self.import_job_state.num_tasklists
-            self.process_tasks_job.total_processing_seconds = self.process_tasks_job.total_processing_seconds + processing_seconds
+            self.process_tasks_job.total_processing_seconds = (
+                self.process_tasks_job.total_processing_seconds + processing_seconds
+            )
             total_processing_time_str = "%.1f seconds" % self.process_tasks_job.total_processing_seconds
             self.process_tasks_job.message = "Imported " + str(self.import_job_state.num_of_imported_tasks) + \
                 " tasks into " +  str(self.import_job_state.num_tasklists) + " tasklists from " + \
@@ -2116,11 +2118,20 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
     def sleep_with_updates(self, sleep_time):
         """ Sleep for a long time, but keep updating, so the job doesn't appear to have stalled """
 
+        fn_name = "sleep_with_updates(): "
+
         if sleep_time <= 0:
             return
 
         while sleep_time > settings.PROGRESS_UPDATE_INTERVAL:
             # Sleep for multiples of PROGRESS_UPDATE_INTERVAL seconds
+            
+            run_seconds = (datetime.datetime.now() - self.run_start_time).total_seconds()
+            if run_seconds > settings.MAX_WORKER_RUN_TIME:
+                logging.info("{}NOTE: Worker has been running for {} seconds, so starting a new worker".format(
+                    fn_name, run_seconds))
+                raise WorkerNearMaxRunTime(run_seconds)            
+            
             self._update_progress(msg='Waiting for server; {:,} seconds to go ...'.format(sleep_time))
             time.sleep(settings.PROGRESS_UPDATE_INTERVAL)
             sleep_time -= settings.PROGRESS_UPDATE_INTERVAL
