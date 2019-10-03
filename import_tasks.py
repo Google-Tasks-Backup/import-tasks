@@ -50,6 +50,7 @@ import model
 import settings
 import appversion # appversion.version is set before the upload process to keep the version number consistent
 import shared # Code which is common between classes, modules or projects
+from shared import job_has_stalled
 import import_tasks_shared  # Code which is common between classes or modules
 import check_task_values
 import constants
@@ -106,7 +107,7 @@ def _send_job_to_worker(self, process_tasks_job): # pylint: disable=too-many-sta
         # ==========================================================
         #       Create a Taskqueue entry to start the import
         # ==========================================================
-        if _job_has_stalled(process_tasks_job):
+        if job_has_stalled(process_tasks_job):
             # Reset job_progress_timestamp on a stalled job, so that Progress handler doesn't see the
             # job as stalled if the worker hasn't yet started processing the re-started job.
             # The downside is that the time in the "Last job progress update was NNNNN seconds ago" message will be lost.
@@ -380,7 +381,7 @@ class MainHandler(webapp2.RequestHandler):
                     
                     pause_reason = process_tasks_job.pause_reason
                 else:
-                    if _job_has_stalled(process_tasks_job):
+                    if job_has_stalled(process_tasks_job):
                         found_paused_job = True
                         job_status = constants.ImportJobStatus.STALLED
                         pause_reason = constants.PauseReason.JOB_STALLED
@@ -557,7 +558,7 @@ class ContinueImportJob(webapp2.RequestHandler):
             return
         
         
-        if process_tasks_job.is_paused or _job_has_stalled(process_tasks_job):
+        if process_tasks_job.is_paused or job_has_stalled(process_tasks_job):
             # ========================================================
             #       Add job to taskqueue for worker to process
             # ========================================================
@@ -1445,7 +1446,7 @@ class ShowProgressHandler(webapp2.RequestHandler):
                     logservice.flush()
                     return
                 else:
-                    if _job_has_stalled(process_tasks_job):
+                    if job_has_stalled(process_tasks_job):
                         status = constants.ImportJobStatus.STALLED
                         error_message = "Job appears to have stalled. Status was " + process_tasks_job.status
                         if process_tasks_job.error_message:
@@ -1655,28 +1656,6 @@ class RobotsHandler(webapp2.RequestHandler):
             logging.debug("Returning robots.txt with disallow all")
             self.response.out.write("Disallow: /\n")
         
-
-        
-def _job_has_stalled(process_tasks_job):
-
-    fn_name = "_job_has_stalled: "
-        
-    if not process_tasks_job.status in constants.ImportJobStatus.STOPPED_VALUES:
-        # Check if the job has stalled (no progress timestamp updates)
-        
-        time_since_last_update = datetime.datetime.now() - process_tasks_job.job_progress_timestamp
-        if time_since_last_update.seconds > settings.MAX_JOB_PROGRESS_INTERVAL:
-            job_start_timestamp = process_tasks_job.job_start_timestamp # UTC
-            time_since_start = datetime.datetime.now() - job_start_timestamp
-            logging.error(fn_name + "Job appears to have stalled. Status = " + 
-                process_tasks_job.status + ". Last job progress update was " + 
-                str(time_since_last_update.seconds) +
-                " seconds ago at " + str(process_tasks_job.job_progress_timestamp) + 
-                " UTC. Job was started " + str(time_since_start.seconds) + 
-                " seconds ago at " + str(job_start_timestamp) + " UTC")
-            return True
-            
-    return False
 
 
 app = webapp2.WSGIApplication( # pylint: disable=invalid-name,bad-whitespace

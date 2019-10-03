@@ -147,5 +147,7 @@ class UsageStats(db.Model):
     
     # Type of uploaded file. Only csv and gtbak are supported
     file_type = db.StringProperty(indexed=False, default=None) # from ImportTasksJob.file_type
-    
-    
+
+
+
+# End of DB models

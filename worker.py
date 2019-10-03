@@ -78,7 +78,7 @@ import host_settings
 import appversion # appversion.version is set before the upload process to keep the version number consistent
 import shared # Code whis is common between classes, modules or projects
 from shared import DailyLimitExceededError, TaskInsertError, WorkerNearMaxRunTime
-from shared import get_http_error_reason, get_http_error_status
+from shared import get_http_error_reason, get_http_error_status, job_has_stalled, log_job_state_summary
 import import_tasks_shared  # Code which is common between classes or modules
 import check_task_values
 import constants
@@ -222,7 +222,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
 
         fn_name = "ProcessTasksWorker.post(): "
 
-        try:
+        try: # pylint: disable=too-many-nested-blocks
             logging.info(fn_name + "<start> (app version %s)" % appversion.version)
             logservice.flush()
 
@@ -272,14 +272,37 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                     if self.process_tasks_job.status != constants.ImportJobStatus.STARTING:
                         # Check if this is a valid continuation job
                         if not self.process_tasks_job.is_waiting_to_continue:
-                            logging.error(fn_name + "<End> Worker started for job with '" +
-                                str(self.process_tasks_job.status) +
-                                "' status, but job is not waiting to continue. Job is probably already running in another worker.")
-                            return
-
+                            if not job_has_stalled(self.process_tasks_job):
+                                logging.error((
+                                    "%sWorker was started for an existing job for %s, " +
+                                    "but job is not 'waiting to continue', and job has not stalled (yet). " +
+                                    "Job is probably already running in another worker."),
+                                        fn_name,
+                                        self.user_email)
+                                log_job_state_summary(self.process_tasks_job)
+                                logging.error(fn_name + "<End>")
+                                return
+                                                               
+                            # Assume that the previous worker finished without setting the
+                            # job state. This can happen if a worker is terminated due to
+                            # DeadlineExceeded, because GAE doesn't allow the worker to call 
+                            # .put() to update the job after DeadlineExceeded.
+                                
+                            logging.error((
+                                "%sRestarting stalled job.\n" + 
+                                "Worker was started for an existing job for %s, " +
+                                "but job is not 'waiting to continue', and job has stalled.\n" +
+                                "Previous worker probably ended unexpectedly, without updating job status."),
+                                    fn_name,
+                                    self.user_email)
+                            log_job_state_summary(self.process_tasks_job)
+                            logging.warning("%sContinuing stalled job for %s",
+                                fn_name,
+                                self.user_email)
+                        
                     # Update DB record to indicate that this worker is now handling this job
-                    # This needs to be set ASAP, in case another worker is started, so other workers know that this
-                    # job is not waiting to be executed.
+                    # This needs to be set ASAP, in case another worker is started, 
+                    # so other workers know that this job is not waiting to be executed.
                     self.process_tasks_job.is_waiting_to_continue = False
                     self.process_tasks_job.put()
 
@@ -1594,7 +1617,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
         logservice.flush()
 
 
-    def insert_missing_task(self, prev_tasks_data): # pylint: disable=too-many-statements,too-many-locals
+    def insert_missing_task(self, prev_tasks_data): # pylint: disable=too-many-statements,too-many-locals,too-many-branches
         """ Insert task into specified tasklist.
 
             args:
@@ -1864,7 +1887,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
         return None
 
 
-    def _delete_tasklist_by_id(self, tasklist_id, tasklist_name=''): # pylint: disable=unused-argument
+    def _delete_tasklist_by_id(self, tasklist_id, tasklist_name=''): # pylint: disable=unused-argument, too-many-branches
         """ Delete specified tasklist.
 
             If tasklist_id is the default tasklist, rename it (because default list cannot be deleted).
@@ -1970,7 +1993,7 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
         logservice.flush()
 
 
-    def _report_error(self, err_msg, log_as_invalid_data=False):
+    def _report_error(self, err_msg, log_as_invalid_data=False): # pylint: disable=too-many-branches
         """ Log error message, and update Job record to advise user of error """
 
         fn_name = "_report_error(): "

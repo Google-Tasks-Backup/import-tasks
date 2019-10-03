@@ -567,3 +567,50 @@ def get_http_error_status(http_err):
         status = -1
         
     return status
+
+
+def log_job_state_summary(process_tasks_job):
+    """ Logs a summary of the job status, start time and time since last update """
+    
+    job_start_timestamp = process_tasks_job.job_start_timestamp # UTC
+    time_since_start = datetime.now() - job_start_timestamp
+    time_since_last_update = datetime.now() - process_tasks_job.job_progress_timestamp
+    seconds_since_last_update = time_since_last_update.total_seconds()
+    
+    pause_reason_str = ''
+    if process_tasks_job.pause_reason:
+        pause_reason_str = "\nPause reason = {}".format(process_tasks_job.pause_reason)
+        
+    waiting_to_continue_str = ''
+    if process_tasks_job.is_waiting_to_continue:
+        waiting_to_continue_str = " (waiting to continue)"
+        
+    logging.info(("Status = %s%s\n" +
+        "Last job progress update was %s seconds ago at %s UTC\n" +
+        "Job was started %s seconds ago at %s UTC%s"),
+            process_tasks_job.status,
+            waiting_to_continue_str,
+            seconds_since_last_update,
+            process_tasks_job.job_progress_timestamp,
+            time_since_start.total_seconds(),
+            job_start_timestamp,
+            pause_reason_str)                    
+    
+
+
+def job_has_stalled(process_tasks_job):
+    """ Returns True if the job has not been updated for at least MAX_JOB_PROGRESS_INTERVAL seconds """
+    fn_name = "job_has_stalled: "
+        
+    if not process_tasks_job.status in constants.ImportJobStatus.STOPPED_VALUES:
+        # Check if the job has stalled (no progress timestamp updates)
+        
+        time_since_last_update = datetime.now() - process_tasks_job.job_progress_timestamp
+        seconds_since_last_update = time_since_last_update.total_seconds()
+        
+        if seconds_since_last_update > settings.MAX_JOB_PROGRESS_INTERVAL:
+            logging.info("%sJob appears to have stalled", fn_name)
+            log_job_state_summary(process_tasks_job)
+            return True
+            
+    return False
