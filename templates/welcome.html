@@ -24,7 +24,7 @@ This is the Django template for the welcome page.
     <head>
         <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
         <title>{{ app_title }}</title>
-        <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css" />
+        <link rel="stylesheet" type="text/css" href="/static/import_tasks.css" />
         <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico?v=2" />
         <meta name="keywords" content="Google Tasks Import, Google Tasks, Import Google Tasks">
         <script type="text/javascript" src="/static/jquery.js"></script>
@@ -32,9 +32,17 @@ This is the Django template for the welcome page.
         <script type="text/javascript">
 
             function authorise() {
-                document.getElementById("authorise_button").value = "Authorising, please wait (this may take up to half a minute) ...";
-                document.getElementById("authorise_button").innerHTML = "Authorising, please wait (this may take up to half a minute) ...";
-                document.getElementById("authorise_button").disabled = true;
+                try {
+                    let signInEl = document.getElementById("sign-in-msg");
+                    let signingInEl = document.getElementById("signing-in-msg");
+                    signingInEl.style.display = 'block';
+                    // signInEl.disabled = true;
+                    signInEl.style.display = 'none';
+                }
+                catch (error) {
+                    console.error("Error changing elements to indicate signin: " +
+                        error);
+                }
                 window.location.href = "{{ url_main_page }}";
             }
 
@@ -165,16 +173,38 @@ This is the Django template for the welcome page.
         </div>
     {% else %}
         <div class="medium-break">
-            This application uses Google authentication to access your Tasks data. The permission for this application will be displayed as "{{ product_name }} - Tasks" in your list of 
+            This application uses Google authentication to access your Tasks data. The permission for this application will be displayed as "{{ product_name }}" in your list of 
             <a href="https://www.google.com/accounts/IssuedAuthSubTokens">Authorised Sites, Apps, and Services</a>, and can be revoked there at any time.
         </div>
     
+        <div class="take-note-para notice-box medium-gap-top big-gap-bottom">
+            <p>
+                I am currently waiting on Google app verification. Until the app has been verified, you may see a page displaying "This app isn't verified".
+            </p>
+            <p>
+                This app is still safe to use. Just click on the "Advanced" link under "This app isn't verified", and then click on the link
+                <br>
+                "Go to tasks-backup.appspot.com"
+            </p>
+        </div>
+        
         {% if user_email %}
-            <button id="authorise_button" class="big-button" type="button" 
-                    onclick="window.location.href = '{{ url_main_page }}'">Main menu</button>
+            <div class="center-text big-gap-top">            
+                <button id="authorise_button" class="big-button" type="button" 
+                        onclick="window.location.href = '{{ url_main_page }}'">Go to main menu</button>
+            </div>
         {% else %}
-            <button id="authorise_button" class="big-button" type="button" onclick="authorise();">Authorise</button>
+            <div id="sign-in-msg" class="sign-in-msg">
+                <span>In order to use GTB to display or export your tasks, you must be signed in: </span>
+                <input type="image" alt="Sign in with Google" title="Sign in with Google"
+                    src="/static/btn_google_signin_dark_normal_web.png"
+                    onclick="authorise();">
+            </div>
+            <div id="signing-in-msg" class="no-display">
+                Authorising, please wait (this may take up to one minute) ...
+            </div>
         {% endif %}
+        
         <div class="medium-break">
             <br />
             There are several methods for importing tasks (chosen on next page);

@@ -25,8 +25,6 @@ import os
 import datetime
 import urllib
 
-import webapp2
-
 
 from google.appengine.api import urlfetch
 from google.appengine.api import logservice # To flush logs
@@ -34,6 +32,9 @@ from google.appengine.api.app_identity import get_application_id
 from google.appengine.ext.webapp import template
 from google.appengine.ext import blobstore
 from google.appengine.ext.webapp import blobstore_handlers
+
+import webapp2
+
 
 from oauth2client.contrib.appengine import OAuth2Decorator
 

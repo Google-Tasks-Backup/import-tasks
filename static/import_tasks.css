@@ -211,6 +211,22 @@ legend
     margin-top:6px;
 }
 
+.medium-gap-top {
+    margin-top:20px;
+}
+
+.medium-gap-bottom {
+    margin-bottom:20px;
+}
+
+.big-gap-top {
+    margin-top: 40px;
+}
+
+.big-gap-bottom {
+    margin-bottom: 40px;
+}
+
 .import-completed-message {
     margin-top:60px;
     margin-left:30px;
@@ -464,9 +480,14 @@ td.not-valid {
     
 .big-button {
     cursor: pointer;
-    width: 100%;
+    width: 50%;
     font-size: 16pt;
     font-weight: bold;
+}
+
+.center-text {
+    width: 100%;
+    text-align: center;
 }
 
 .medium-button {
@@ -698,6 +719,24 @@ h3.numbered:before {
     /* Make the first line of an error message stand out */
     font-size: 130%;
 }
+
+
+.sign-in-msg span {
+    font-weight: bold;
+    vertical-align:middle;
+}
+
+.sign-in-msg input {
+    vertical-align:middle;
+}
+
+
+@media print {
+    .print_keep_together {
+        break-inside: avoid;
+    }
+}
+
 
 /*
  * *********************

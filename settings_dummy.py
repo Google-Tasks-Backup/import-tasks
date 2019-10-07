@@ -148,6 +148,13 @@ FRONTEND_API_RETRY_SLEEP_DURATION = 18
 QUOTA_EXCEEDED_API_RETRY_SLEEP_DURATION = 120
 
 
+# The number of seconds to sleep if the worker receives an AccessTokenRefreshError.
+# If a user starts a job, but has not (yet) approved access to Google Tasks, Google displays
+# several screens, all of which the user must acknowledge before Google grants access to tasks.
+# Attempts to access Tasks during this time results in 'invalid_grant'
+# This delay is to allow the user to go through the multi-page approval process.
+WORKER_INVALID_GRANT_SLEEP_DURATION = 90
+
 
 # If the import hasn't finished within MAX_WORKER_RUN_TIME seconds, we stop the current import run, and then
 # add the job to the taskqueue to continue the import process in a new worker.

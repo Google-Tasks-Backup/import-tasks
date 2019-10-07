@@ -11,8 +11,8 @@
 #   - revision (last part of 'version' string) is incremented by 1
 #   - 'upload_timestamp' is automatically generated
 #
-version = '0.13.006' # pylint: disable=invalid-name
-upload_timestamp = '2019-10-03 11:27' # pylint: disable=invalid-name
-app_yaml_version = 'gti-0-13-006' # pylint: disable=invalid-name
+version = '0.14.003' # pylint: disable=invalid-name
+upload_timestamp = '2019-10-07 14:53' # pylint: disable=invalid-name
+app_yaml_version = 'gti-0-14-003' # pylint: disable=invalid-name
 app_yaml_application = 'import-tasks' # pylint: disable=invalid-name
-serving_url = 'https://gti-0-13-006-dot-import-tasks.appspot.com' # pylint: disable=invalid-name
+serving_url = 'https://gti-0-14-003-dot-import-tasks.appspot.com' # pylint: disable=invalid-name

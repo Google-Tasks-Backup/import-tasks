@@ -372,10 +372,13 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                             break # Success, so break out of the retry loop
 
                         except apiclient_errors.HttpError as http_err:
-                            self._handle_http_error(fn_name, http_err, retry_count, "Error connecting to Tasks services")
+                            self._handle_http_error(fn_name, http_err, retry_count, 
+                                "Error making initial connection to Tasks services")
 
-                        except Exception, e: # pylint: disable=broad-except
-                            self._handle_general_error(fn_name, e, retry_count, "Error connecting to Tasks services")
+                        except Exception as ex: # pylint: disable=broad-except
+                            self._handle_general_error(fn_name, ex, retry_count, 
+                                "Error making initial connection to Tasks services",
+                                first_connect_to_tasks_service=True)
 
                     if self.process_tasks_job.status == constants.ImportJobStatus.STARTING:
                         # Only change status to initialising the first time
@@ -2087,32 +2090,61 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
             self.sleep_with_updates(settings.API_RETRY_SLEEP_DURATION)
 
 
-    def _handle_general_error(self, fn_name, e, retry_count, err_msg):
+    def _handle_general_error(self, fn_name, ex, retry_count, err_msg, first_connect_to_tasks_service=False):
+        """
+            first_connect_to_tasks_service should only be set to True in the exception handler
+            for the first connection (to prep the service)
+        """
         self._update_progress(force=True)
         if retry_count > 0:
-            if isinstance(e, AccessTokenRefreshError):
+            if isinstance(ex, AccessTokenRefreshError):
                 # Log first 'n' AccessTokenRefreshError as Info, because they are reasonably common,
                 # and the system usually continues normally after the 2nd instance of
                 # "new_request: Refreshing due to a 401"
                 # Occassionally, the system seems to need a 3rd attempt
                 # (i.e., success after waiting 45 seconds)
+                if first_connect_to_tasks_service:
+                    # This is the first attempt at connecting to the Tasks service for this worker.
+                    # If the user has not previously authorised access to Tasks, the user will be
+                    # presented with a several page approval flow, which could take some time.
+                    # If the worker attempts to access the Tasks before then, we get 'invalid_grant'.                    
+                    # We sleep to allow the user to complete the approval process.
+                    if retry_count > 1:
+                        # We start with shorter sleeps, in case the user finishes quickly
+                        sleep_duration = settings.WORKER_INVALID_GRANT_SLEEP_DURATION / retry_count
+                    else:
+                        # Last chance, so sleep for the full WORKER_INVALID_GRANT_SLEEP_DURATION seconds
+                        sleep_duration = settings.WORKER_INVALID_GRANT_SLEEP_DURATION
+                    logging.info("%s%s: %s for %s (not yet an error)\n" +
+                        "%s attempts remaining. Sleeping for %s seconds",
+                        fn_name,
+                        shared.get_exception_msg(ex),
+                        err_msg,
+                        self.user_email,                        
+                        retry_count,
+                        sleep_duration)
+                    self.sleep_with_updates(sleep_duration)
+                    logging.info("%sRetrying after sleeping for %s seconds", 
+                        fn_name, sleep_duration)
+                    return
+                    
                 logging.info(fn_name +
                     "Access Token Refresh Error: " + err_msg + " (not yet an error). " +
-                    str(retry_count) + " attempts remaining: " + shared.get_exception_msg(e))
+                    str(retry_count) + " attempts remaining: " + shared.get_exception_msg(ex))
             else:
-                logging.warning(fn_name + "Error: " + err_msg + ": " + shared.get_exception_msg(e) + "\n" +
+                logging.warning(fn_name + "Error: " + err_msg + ": " + shared.get_exception_msg(ex) + "\n" +
                     str(retry_count) + " attempts remaining")
             logservice.flush()
         else:
             logging.exception("%sError: %s: %s\nGiving up after %s attempts",
                               fn_name,
                               err_msg,
-                              shared.get_exception_msg(e),
+                              shared.get_exception_msg(ex),
                               settings.NUM_API_TRIES)
                               
             logservice.flush()
             self._report_error(err_msg)
-            raise e
+            raise ex
 
         # Last chances - sleep to give the server some extra time before re-requesting
         if retry_count <= 2:
@@ -2121,7 +2153,9 @@ class ProcessTasksWorker(webapp2.RequestHandler): # pylint: disable=too-many-ins
                 settings.API_RETRY_SLEEP_DURATION)
             logservice.flush()
             self.sleep_with_updates(settings.API_RETRY_SLEEP_DURATION)
-
+            logging.info("%sRetrying after sleeping for %s seconds", 
+                        fn_name, settings.API_RETRY_SLEEP_DURATION)
+ 
 
     def _update_progress(self, msg=None, force=False):
         """ Update progress so that job doesn't stall """

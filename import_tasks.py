@@ -245,6 +245,7 @@ class WelcomeHandler(webapp2.RequestHandler):
                 if not self.request.host in settings.PRODUCTION_SERVERS:
                     if shared.is_test_user(user_email):
                         # Allow test user to see normal page content
+                        logging.info("%sAllowing test user to see normal page content", fn_name)
                         display_link_to_production_server = False # pylint: disable=invalid-name
                     else:
                         logging.info("%sRejecting non-test user [%s] on limited access server %s",
@@ -256,7 +257,15 @@ class WelcomeHandler(webapp2.RequestHandler):
                 logging.debug(fn_name + "User is not logged in, so won't display logout link")
             logservice.flush()
             
-            
+            if display_link_to_production_server and self.request.get("test_welcome_page"):
+                display_link_to_production_server = False # pylint: disable=invalid-name
+                logging.info("%sTESTING: Displaying normal Welcome page because 'test_welcome_page' query arg is set",
+                    fn_name)
+                logservice.flush()                
+                    
+            if display_link_to_production_server:
+                logging.debug(fn_name + "Displaying link to production server")
+                    
             template_values = {'app_title' : host_settings.APP_TITLE,
                                'display_link_to_production_server' : display_link_to_production_server,
                                'production_server' : settings.PRODUCTION_SERVERS[0],

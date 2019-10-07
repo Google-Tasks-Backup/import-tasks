@@ -24,7 +24,7 @@ This is the Django template for main import start page.
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
         <title>{{ app_title }}</title>
-        <link rel="stylesheet" type="text/css" href="/static/tasks_backup.css" />
+        <link rel="stylesheet" type="text/css" href="/static/import_tasks.css" />
         <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
         <script type="text/javascript" src="/static/jquery.js"></script>
         <script type="text/javascript" src="/static/popup.js"></script>
@@ -312,15 +312,33 @@ This is the Django template for main import start page.
                     When you select a file, the contents of that file is uploaded to the server. 
                     The amount of time required to upload the file depends on the size of the file, 
                     and the uplink speed of your Internet connection. 
-                    For example, a 5MB file could take up to 2 minutes to upload on a 8192/64 ADSL link. 
+                    For example, a 5MB file could take several minutes to upload on slow ADSL link. 
                     {{ app_title }} cannot show upload progress, as the upload is managed by the browser.
                 </div>
+
+
+                <div class="instructions">
+                    Once the file has been uploaded, you may be redirected to a Google sign in page, to authorise access for this application to access your Google Tasks. You must grant permission to allow this application to access your tasks. You can revoke this permission at any time from the Google permissions page at <a href="https://myaccount.google.com/permissions?pli=1">https://myaccount.google.com/permissions</a> 
+                </div>
+                <div class="take-note-para notice-box">
+                    <p>
+                        I am currently waiting on Google app verification. Until the app has been verified, you may see a page displaying "This app isn't verified".
+                    </p>
+                    <p>
+                        This app is still safe to use. Just click on the "Advanced" link under "This app isn't verified", and then click on the link
+                        <br>
+                        "Go to import-tasks.appspot.com"
+                    </p>
+                </div>
+
                 <div class="select-import-file">
                     Once the file has been uploaded, you will be redirected to a page which will update regularly to 
-                    show progress of the background task as it creates tasks from the imported data.
+                    show progress as tasks are created from the imported data.
+                </div>
+                <div class="instructions">
                     The amount of time taken to process the imported data depends on various factors, including 
                     server load and the total number of tasks. If the server is heavily loaded, it can take up to 1 second per task,
-                    so please be patient!
+                    so please be patient.
                 </div>
             </fieldset>
         </form>
@@ -334,7 +352,7 @@ This is the Django template for main import start page.
 
     <div class="break">
         <div class="take-note">
-            CAUTION: Do not make any changes to imported tasklists until the import is complete!
+            CAUTION: Do not make any changes to Tasks until the import is complete!
         </div>
         <div class="medium-break">
             Moving, adding, deleting or editing tasks in an imported tasklist during an import may result in a corrupted import.
